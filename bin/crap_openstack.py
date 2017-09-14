@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
 """
-ADEPT VM provisioning / cleanup script for the openstack ansible group.
+CRAP VM provisioning / cleanup script for the openstack ansible group.
 
 Assumed to be running under an exclusive lock to prevent TOCTOU race
 and/or clashes with existing named VMs.
@@ -38,7 +38,7 @@ DISCOVER_CREATE_NAME = 'openstack_discover_create.py'
 DESTROY_NAME = 'openstack_destroy.py'
 ALLOWED_NAMES = (DISCOVER_CREATE_NAME, DESTROY_NAME, ONLY_CREATE_NAME)
 
-DESCRIPTION = ('Low dependency script called by ADEPT playbooks'
+DESCRIPTION = ('Low dependency script called by CRAP playbooks'
                ' to manage OpenStack VMs.')
 
 EPILOG = ('Required:  The WORKSPACE environment variable must exist and point to a'
@@ -131,8 +131,8 @@ ansible_become: False
 ansible_connection: ssh
 """
 
-WORKSPACE_LOCKFILE_PREFIX = '.adept_job_workspace'
-GLOBAL_LOCKFILE_PREFIX = '.adept_global_floatingip'
+WORKSPACE_LOCKFILE_PREFIX = '.crap_workspace'
+GLOBAL_LOCKFILE_PREFIX = '.crap_global'
 
 class Singleton(object):
     """

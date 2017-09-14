@@ -1,1 +1,0 @@
-adept_openstack.py
