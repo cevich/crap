@@ -1,0 +1,10 @@
+---
+
+# When true, touch touchstone_filepath.
+touch_touchstone: False
+
+# Full/absolute path to filename used to mark state.  Must persist.
+touchstone_filepath: '.touchstone'
+
+# Do not use directly, this is set 'True' after role, if touchstone_filepath exists
+stone_touched: False

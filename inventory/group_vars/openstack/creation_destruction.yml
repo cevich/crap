@@ -1,16 +1,11 @@
 ---
 
-# uncomment to force all peons to have public IPs
-# allocated (default assumes kommandir is able to reach private IPs)
-# public_peons: True
-
-cloud_environment:
-    USER_CONFIG_DIR: "{{ hostvars.kommandir.workspace }}"
-    SITE_CONFIG_DIR: "{{ hostvars.kommandir.workspace }}"
-    OS_CLIENT_CONFIG_FILE: "{{ hostvars.kommandir.workspace }}/clouds.yml"
-    OS_CLOUD: "default"
-    HOME: "{{ hostvars.kommandir.workspace }}"
-    WORKSPACE: "{{ hostvars.kommandir.workspace }}"
+creation_destruction_environment:
+    WORKSPACE: '{{ playbook_dir }}'
+    USER_CONFIG_DIR: '{{ lookup("env", "USER_CONFIG_DIR") | default("",True) }}'
+    SITE_CONFIG_DIR: '{{ lookup("env", "SITE_CONFIG_DIR") | default("",True) }}'
+    OS_CLIENT_CONFIG_FILE: '{{ lookup("env", "OS_CLIENT_CONFIG_FILE") | default("",True) }}'
+    OS_CLOUD: '{{ lookup("env", "OS_CLOUD") | default("default",True) }}'
     OS_AUTH_URL: '{{ lookup("env", "OS_AUTH_URL") | default("",True) }}'
     OS_TENANT_ID: '{{ lookup("env", "OS_TENANT_ID") | default("",True) }}'
     OS_TENANT_NAME: '{{ lookup("env", "OS_TENANT_NAME") | default("",True) }}'
@@ -18,40 +13,26 @@ cloud_environment:
     OS_USERNAME: '{{ lookup("env", "OS_USERNAME") | default("",True) }}'
     OS_PASSWORD: '{{ lookup("env", "OS_PASSWORD") | default("",True) }}'
     OS_REGION_NAME: '{{ lookup("env", "OS_REGION_NAME") | default("",True) }}'
-    OS_CLOUD: '{{ lookup("env", "OS_CLOUD") | default("",True) }}'
 
-cloud_asserts:
-    - 'empty is defined'
-    - 'peon_image is defined'
-    - 'peon_flavor is defined'
-    - 'hostvars.kommandir.workspace is defined'
-    # These were setup by exekutir
-    - '"{{ ansible_private_key_file }}.pub" | is_file'
-    - '"{{ hostvars.kommandir.workspace }}/ssh/exekutir_key.pub" | is_file'
-    # Exekutir's extra_kommandir_setup should have taken care of this
-    - '"{{ hostvars.kommandir.workspace }}/clouds.yml" | is_file'
-    # Verify python-virtualenv is available
+creation_destruction_asserts:
+    - 'uuid | default("", True) | trim | length'
+    - 'subject_image | default("", True) | trim | length'
+    - 'subject_flavor | default("", True) | trim | length'
     - '"/usr/bin/virtualenv" | is_file'
-    # Verify python2.7 is available
-    - '"/usr/bin/python2.7" | is_file'
-    # Verify redhat-rpm-config is available
-    - '"/usr/lib/rpm/macros.d" | is_dir'
+    - 'ansible_private_key_file | default("", True) | trim | is_file'
 
-cloud_provisioning_command:
+creation_command:
     command: >
-        bin/openstack_exclusive_create.py \
-            {{ "--verbose" if adept_debug == True else "" }} \
-            {{ "--lockdir=" ~ hostvars.kommandir.global_lockdir | trim if hostvars.kommandir.global_lockdir|default() not in empty else ""}} \
-            --image {{ peon_image | trim }} \
-            --flavor {{ peon_flavor | trim }} \
-            {{ "--private" if public_peons is undefined or public_peons != True else "" }} \
-            {{ "--size " ~ peon_size | trim if peon_size is defined else "" }} \
-            {{ "--userdata " ~ peon_userdata | trim if peon_userdata is defined else "" }} \
-            {{ inventory_hostname }}-{{ uuid | trim }} \
-            {{ ansible_private_key_file | trim }}.pub \
-            {{ hostvars.kommandir.workspace }}/ssh/exekutir_key.pub
-    chdir: "{{ hostvars.kommandir.workspace }}"
+        bin/openstack_exclusive_create.py
+        --lockdir=/tmp
+        --image={{ subject_image | trim | quote }}
+        --flavor={{ subject_flavor | trim | quote }}
+        {{ "--size=" ~ subject_size | trim | quote if subject_size is defined else "" }}
+        {{ "--userdata=" ~ subject_userdata | trim | quote if subject_userdata is defined else "" }}
+        {{ inventory_hostname }}-{{ uuid }}
+        {{ ansible_private_key_file | trim }}.pub
+    chdir: "{{ playbook_dir }}"
 
-cloud_destruction_command:
+destruction_command:
     command: "bin/openstack_destroy.py {{ inventory_hostname }}-{{ uuid }}"
-    chdir: "{{ hostvars.kommandir.workspace }}"
+    chdir: "{{ playbook_dir }}"

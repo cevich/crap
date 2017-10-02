@@ -1,40 +1,28 @@
 ---
 
-- assert:
+- name: Input expectations are verified
+  assert:
     that:
-        - 'empty is defined'
-        - 'rhsm | default() not in empty'
-        - 'rhsm.username | default() not in empty'
-        - 'rhsm.password | default() not in empty'
+        - 'rhsm | default("", True) | length or ansible_check_mode'
+        - 'rhsm.username | default("", True) | trim | length or ansible_check_mode'
+        - 'rhsm.password | default("", True) | trim | length or ansible_check_mode'
+        - 'role_path | is_dir'
 
-- name: Key variables are displayed
-  debug:
-    var: "{{ item }}"
-  when: adept_debug
-  with_items:
-    - ["rhsm.username", "rhsm.org", "rhsm.insecure", "rhsm.baseurl"]
-    - ["rhsm.hostname", "rhsm.force", "rhsm_retries", "rhsm_delay"]
-
-# rhsm_baseurl/server_hostname only modify configuration in
-# redhat_subscription module.  More reliable to just pass on
-# the command-line directly
 - name: System is registered and subscribed
-  shell: "{{ lookup('template', '../templates/sub-man-cmd.j2') | trim }}"
-  # Don't put credentials on the command-line for safety's sake
-  environment:
-    RHSM_USERNAME: "{{ rhsm.username }}"
-    RHSM_PASSWORD: "{{ rhsm.password }}"
-    RHSM_ORG: "{{ rhsm.org | default('') }}"
-  register: result
-  failed_when: result.rc != 0 and
+  raw: '{{ lookup("template", role_path ~ "/templates/sub-man-cmd.j2") | trim }}'
+  failed_when: not_check or result.rc != 0 and
                not result.stderr | search("already registered")
-  until: result | success
-  retries: "{{ rhsm_retries | default(omit) }}"
-  delay: "{{ rhsm_delay | default(omit) }}"
+  # Keep credentials out of logs
+  no_log: True
+  ignore_errors: True
+  register: result
+  when: rhsm | default('', True) | length
 
-- debug: var=result
-  when: adept_debug
-
-- name: System is pinned to a specific release (no updates/installs past this version)
-  command: "subscription-manager release --set={{ rhsm.release }}"
-  when: rhsm.release | default() not in empty
+- name: The subscription-manager register command failed
+  fail:
+    msg: |
+      subscription-manager register command failed
+      exit: {{ result.rc }}
+      stdout: {{ result.stdout }}
+      stderr: {{ result.stderr }}
+  when: result | failed and not_check

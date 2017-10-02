@@ -1,0 +1,12 @@
+---
+
+# Avoid needing to specify image names in every subject's host_vars
+docker_fqin: >
+  {#- RHEL Images -#}\
+  {%-   if inventory_hostname|search("rhel7") -%}
+  {#- Fedora Images -#}\
+  {%- elif inventory_hostname|search("fedora25") -%}registry.fedoraproject.org/fedora:25
+  {%- elif inventory_hostname|search("fedora26") -%}registry.fedoraproject.org/fedora:26
+  {%- elif inventory_hostname|search("fedora") -%}registry.fedoraproject.org/fedora:latest
+  {%- else -%}{{ 'Error: subject not found while looking up fqin-name' | comment }}
+  {%- endif -%}

@@ -1,77 +1,115 @@
 ---
 
-- name: Important common facts are defined
+# N/B: Only fact setting / checking plus local action tasks may happen here
+
+- name: The ansible_check_mode variable is inverted and buffered
   set_fact:
-    empty:
-        - Null
-        - ""
-        - []
-        - {}
+    not_checking: "{{ not ansible_check_mode | default(False) }}"
+
+- name: This host's hostvarsfile variable is initialized.
+  set_fact:
     hostvarsfile: "{{ inventory_dir }}/host_vars/{{ inventory_hostname }}.yml"
-    result:
-    ansible_private_key_file: '{{ hostvars.kommandir.workspace }}/ssh/kommandir_key'
+  when: hostvarsfile is undefined
 
-# NO clue why this doesn't get picked up from inventory/group_vars/all.yml
-- name: The no_log_synchronize variable is defined
+- name: This host's hostvarsfile backup filename is defined
   set_fact:
-    no_log_synchronize: True
-  when: no_log_synchronize is undefined
+    hostvarsfilebackup: '{{ hostvarsfile | dirname }}/.{{ hostvarsfile | basename }}~'
 
-- assert:
-    # These are set automatically by adept.py
-    that:
-        - "empty is defined"
-        - "workspace | default() not in empty"
-        - "adept_path | default() not in empty"
-        - "adept_context | default() not in empty"
-        - "uuid | default() not in empty"
-        - "job_name | default() not in empty"
-        - "groups.peons is defined"
-        - 'no_log_synchronize | default() not in empty'
-        - "default_peon_cloud_group | default() not in empty"
+- name: This host's hostvarsfile is backed up if no backup exists
+  copy:
+    dest: '{{ hostvarsfilebackup }}'
+    src: '{{ hostvarsfile }}'
+  delegate_to: localhost
+  when: not hostvarsfilebackup | is_file and
+        not hostvarsfile | is_link
 
-- name: Results sub-directory for exists for inventory_hostname
-  file:
-  args:
-    path: "{{ hostvars.kommandir.workspace }}/results/{{ inventory_hostname }}"
-    state: directory
-  when: 'adept_context == "setup" and inventory_hostname != "kommandir"'
-  delegate_to: kommandir
+- name: Verify handling of certain incantations with this ansible version
+  include: "check_mode.yml"
+  when: ansible_check_mode | default(False)
 
-- block:  # when: inventory_hostname == "kommandir"
+- name: Common tasks exclusive to localhost are performed
+  block:
 
-    - name: The kommandir is always a member of the nocloud group
-      add_host:
-        name: "kommandir"
-        groups: "nocloud"
-
-    - name: The peon_cloud_group variable is set from defaults
+    - name: The cloud_group variable is set from defaults
       set_fact:
-        peon_cloud_group: '{{ default_peon_cloud_group }}'
-      when: peon_cloud_group is undefined
+        cloud_group: '{{ default_cloud_group }}'
+      when: cloud_group is undefined
 
-    - name: The kommandir groups all peons from their peon_groups list
+    - name: Localhost groups all subjects from their join_groups list
       add_host:
         name: '{{ item.inventory_hostname }}'
-        groups: '{{ item.peon_groups }}'
-      when: 'item.peon_groups | default() not in empty'
-      with_items: "{{ groups['peons'] | map('extract', hostvars) | list }}"
-      # This one is really noisy
-      no_log: '{{ no_log_synchronize }}'
+        groups: '{{ item.join_groups }}'
+      when: item.join_groups | default('', True) | length
+      with_items: "{{ groups['subjects'] | map('extract', hostvars) | list }}"
+      no_log: True  # This is really noisy
 
-    - name: Kommandir's hostvars are logged into results dir
-      blockinfile:
-        block: |
-          ---
-          {{ hostvars.kommandir | to_nice_yaml }}
-        create: True
-        marker: "##### ANSIBLE MANAGED FILE ({{ role_path }})"
-        path: "{{ hostvars.kommandir.workspace }}/results/kommandir_facts.yml"
+    - name: The current epoch is buffered in hex-format to include miliseconds
+      command: >
+        python3 -c 'import time; print("{:x}".format(int(time.time()*1000)))'
+      register: result
 
-  when: 'inventory_hostname == "kommandir"'
+    - name: Buffer used as short/simple UUID to identify this playbook run
+      set_fact:
+        uuid: '{{ result.stdout | default(ansible_check_mode | string ) }}'
+      when: uuid is undefined
 
-- name: Key variables are displayed
+    - name: Localhost's subject_created flag is always True
+      set_fact:
+        subject_created: True
+
+    - name: Localhost input expectations are verified
+      assert:
+        that:
+            - 'uuid | default("", True) | trim | length'
+            - 'subject_created == True'
+            - 'cloud_group is defined'
+            - 'default_cloud_group | default("", True) | trim | length'
+            - 'groups.subjects is defined'
+
+  when: inventory_hostname == "localhost"
+
+- name: All other host's common tasks are performed
+  block:
+
+    - name: The subject_created flag is False by default
+      set_fact:
+        subject_created: False
+      when: subject_created is undefined
+
+    - name: All hosts share the same playbook run UUID as localhost
+      set_fact:
+        uuid: '{{ hostvars.localhost.uuid }}'
+
+  when: 'inventory_hostname != "localhost"'
+
+- name: Common host_vars are cemented into hostvarsfile for all hosts
+  include_role:
+    name: host_vars_mod
+  vars:
+    source_role: "common"
+    hostvarsfile_updates:
+      # None of these should change during play, resolve all jinja2 template values
+      uuid: '{{ hostvars.localhost.uuid }}'
+      hostvarsfile: '{{ hostvarsfile }}'
+      not_checking: "{{ not_checking | default(True) }}"
+
+- name: Critical expectations are verified
+  assert:
+    that:
+      - 'uuid | default("", True) | trim | length'
+      - 'subject_created is defined'
+      - 'subject_created in [True, False]'
+      - 'hostvarsfile is defined'
+      - 'hostvarsfile | is_file'
+      - 'not_checking is defined'
+      - 'not_checking in [True, False]'
+
+- name: Important host facts are logged for debugging
   debug:
-    var: "{{ item }}"
-  when: adept_debug
-  with_items: ["uuid","job_name","adept_context","workspace","inventory_hostname","group_names","groups","adept_optional","adept_path","hostvarsfile","cleanup"]
+    var: '{{ item }}'
+  with_items:
+    - uuid
+    - subject_created
+    - hostvarsfile
+    - groups
+    - group_names

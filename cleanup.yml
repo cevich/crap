@@ -1,30 +1,85 @@
 ---
 
-# N/B: This file can be overwritten by a copy from job_path.
-
-# Required for peons to be grouped
-- hosts: kommandir
+- name: Localhost is initialized, resets and joins all subjects to their join_groups
+  hosts: localhost
+  # Needed for --list-tags and --check
+  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
   vars_files:
-      - kommandir_vars.yml
+    - vars.yml
+  tags:
+    - cleanup
+  pre_tasks:  # Some host may have failed a task
+    - name: Any failed state cleared from all inventory hosts
+      meta: clear_host_errors
+      changed_when: true
   roles:
     - common
 
-- hosts: peons
-  # Can't assume all hosts are reachable
-  gather_facts: False
+- name: Attempt to unregister any subscribed subjects
+  hosts: subjects
+  gather_facts: False  # Don't assume all hosts are reachable
   vars_files:
-      - kommandir_vars.yml
+    - vars.yml
+  tags:
+    - cleanup
   roles:
-    - common
-    - peon_common
     - role: unsubscribed
-      when: cleanup and
-            "subscribed" in group_names
-    - role: peon_destroyed
-      when: 'cleanup | default(True) and inventory_hostname != "kommandir"'
+      when: rhsm | default("", True) | trim | length and
+            rhsm.username | default("", True) | trim | length and
+            rhsm.password | default("", True) | trim | length and
+            rhsm.unsubscribe
 
-- hosts: kommandir
+- name: Localhost resets cache and all host status for destruction
+  hosts: localhost
   vars_files:
-      - kommandir_vars.yml
+    - vars.yml
+  tags:
+    - cleanup
+  tasks:
+    - name: Any failed state cleared from all inventory hosts
+      meta: clear_host_errors
+      changed_when: true
+
+- name: Attempt to destroy all subjects
+  hosts: subjects
+  gather_facts: False  # Don't assume all hosts are reachable
+  vars_files:
+    - vars.yml
+  tags:
+    - cleanup
   roles:
-    - workspace_cleanup
+    - role: destroyed
+      when: destruction_command | default("", True) | trim | length
+
+- name: Localhost resets cache and all host status for destruction
+  hosts: localhost
+  vars_files:
+    - vars.yml
+  tags:
+    - cleanup
+  tasks:
+    - name: Any failed state cleared from all inventory hosts
+      meta: clear_host_errors
+      changed_when: true
+
+- name: Attempt to restore hostvarsfile from backup
+  hosts: all
+  gather_facts: False  # Don't assume all hosts are reachable
+  vars_files:
+    - vars.yml
+  tags:
+    - cleanup
+  roles:
+    - common
+  post_tasks:
+    - name: This host's hostvarsfilebackup is restored
+      copy:
+        dest: '{{ hostvarsfile }}'
+        src: '{{ hostvarsfilebackup }}'
+      delegate_to: localhost
+      when: hostvarsfilebackup | default("", True) | trim | is_file
+    - name: Old hostvarsfilebackup files are removed
+      file:
+        path: '{{ hostvarsfilebackup }}'
+        state: absent
+      delegate_to: localhost

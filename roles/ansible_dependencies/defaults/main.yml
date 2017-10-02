@@ -1,0 +1,4 @@
+---
+
+# Required rpms for ansible to function
+ansible_dependencies: python libselinux-python yum-utils python3-pycurl python-simplejson rsync

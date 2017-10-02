@@ -1,0 +1,57 @@
+---
+
+- name: Input expectations are verified
+  assert:
+    that:
+        - 'inventory_hostname != "localhost"'
+        - 'creation_command is defined'
+        - 'destruction_command is defined'
+        - 'creation_destruction_environment is defined'
+        - 'creation_destruction_asserts is defined'
+
+# Allows customized checking of jinja templates / variables in cloud_provisioning_command
+- name: Subject's list of optional creation_destruction_asserts are all true
+  assert:
+    that: '{{ creation_destruction_asserts }}'
+  # Don't actually fail the task, still attempt to destroy subject
+  ignore_errors: True
+  when: creation_destruction_asserts | default('', True) | length
+
+- name: Subject's destruction_command is executed
+  command: "{{ destruction_command.command }}"
+  environment: "{{ creation_destruction_environment if creation_destruction_environment | default('', True) | trim | length else {} }}"
+  args:
+    chdir: "{{ destruction_command.chdir | default(playbook_dir) }}"
+    executable: "{{ destruction_command.executable | default(omit) }}"
+    creates: "{{ destruction_command.creates | default(omit) }}"
+    removes: "{{ destruction_command.removes | default(omit) }}"
+  # There are many ways this could fail, hostvarsfile update affects ultimate removal
+  ignore_errors: True
+  register: result
+  when: destruction_command | default('', True) | trim | length
+  delegate_to: localhost
+
+- name: Display result if cloud_destruction_command failed
+  debug:
+    var: "result"
+  when: cloud_destruction_command | default('', True) | trim | length and
+        result | failed
+
+- name: Clear hostvarsfile_updates buffer
+  set_fact:
+    result: {}
+
+- name: Fill buffer with null behavioral_inventory_parameters as needed
+  set_fact:
+    result: '{{ result | combine({item: "DELETEME"}) }}'
+  when: item in hostvars[inventory_hostname]
+  with_items: '{{ behavioral_inventory_parameters }}'
+
+- name: Localhost maintains subject's hostvars file
+  include_role:
+    name: host_vars_mod
+    private: False
+  vars:
+    source_role: destroyed
+    # Workaround yaml/json parsing bug in some Ansible versions
+    hostvarsfile_updates: '{{ result | combine( {"subject_created": False} ) }}'

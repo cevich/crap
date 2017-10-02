@@ -1,0 +1,6 @@
+---
+
+rhsm:
+    username: somebody
+    password: something
+    unsubscribe: true

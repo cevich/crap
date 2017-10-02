@@ -67,3 +67,19 @@ coverage.xml
 .venv
 venv/
 ENV/
+
+# Ansible stuffs
+ansible.log
+.ansible
+
+# Openstack credentials
+clouds.yml
+
+# Lock files of any sort
+*.lock
+
+# Virtual environment directory
+.virtualenv/
+.venvbootstrap/
+artifacts
+artifacts/.*

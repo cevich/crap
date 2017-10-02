@@ -1,0 +1,23 @@
+---
+
+- name: Input expectations are verified
+  assert:
+    that:
+        - 'ansible_dependencies | default("", True) | trim | length'
+
+- name: Some hosts may need ansible-dependencies installed before anything else happens.
+  raw: >
+    $(type -P dnf || type -P yum || echo ) install -y {{ ansible_dependencies }} && touch "/tmp/.{{ role_path | basename }}"
+  register: result
+  args:
+    executable: "/bin/bash"
+    creates: "/tmp/.{{ role_path | basename }}"
+  changed_when: result | success
+  until: result | success
+  retries: 3
+  delay: 10
+
+- name: Hosts facts are gathered
+  setup:
+    gather_subset: network
+  when: hostvars.localhost.not_checking == True

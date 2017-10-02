@@ -1,0 +1,5 @@
+# Predefined (default) group of hosts to create with shell + add_host
+[subjects]
+
+fedora26
+fedora25

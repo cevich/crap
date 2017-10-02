@@ -1,0 +1,4 @@
+---
+
+# Default to small, override in host_vars as needed
+subject_flavor: 'm1.small'

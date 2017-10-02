@@ -1,0 +1,53 @@
+---
+
+- name: Verify task is running running in check-mode
+  assert:
+    that: 'not_checking == False'
+
+- name: Temporary 'result' variable is cleared and set to a known value
+  set_fact:
+    result: "sentinel"
+
+- name: Verify temporary 'result' buffer is not read-only
+  assert:
+    that: 'result == "sentinel"'
+
+- name: Verify non-empty string converts to False
+  assert:
+    that: 'result | bool == False'
+
+- name: Empty string value conversion evaluates false
+  assert:
+    that: 'not "  " | trim | length'
+
+- name: Non-empty string value conversion evaluates true
+  assert:
+    that: '"non-empty" | trim | length'
+
+- name: Empty/null values is buffered for bool-conversion testing
+  set_fact:
+      result:
+
+- name: Empty/Null value string-conversion evaluates false
+  assert:
+    that: 'not result | default("", True) | trim | length'
+
+- name: Verify non-existant test-variable is undefined
+  assert:
+    that: 'fOoBaR42 is undefined'
+
+- name: Verify non-existant test-variable evaluates false
+  assert:
+    that: 'not fOoBaR42 | default("", True) | trim | length'
+
+- name: Verify that an inventory-directory is defined, non-empty and an actual directory
+  assert:
+    that:
+      - 'inventory_dir | default("", True) | trim | length'
+      - 'inventory_dir | is_dir'
+
+- name: Verify that hostvarsfile is defined, non-empty, and an actual file
+  assert:
+    that:
+      - 'hostvarsfile | default("", True) | trim | length'
+      - 'hostvarsfile | is_file'

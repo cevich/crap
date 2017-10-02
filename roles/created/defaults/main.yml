@@ -1,0 +1,14 @@
+---
+
+# Dictionary of required environment variables, if any
+creation_destruction_environment:
+
+# List of Ansible 'assert' module 'with' strings that must all be true
+creation_destruction_asserts:
+
+# Ansible 'shell' module arguments for creating host,
+# if successful, host_vars YAML expected on stdout
+creation_command:
+
+# Ansible 'shell' module arguments for destroying host
+destruction_command:

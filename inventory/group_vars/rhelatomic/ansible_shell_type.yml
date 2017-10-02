@@ -1,4 +1,0 @@
----
-
-# Ansible gets really mad on atomic hosts if this is not set
-ansible_shell_type: sh

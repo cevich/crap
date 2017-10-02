@@ -1,0 +1,61 @@
+---
+
+- name: stone_touched fact is initially false
+  set_fact:
+    stone_touched: False
+
+- name: Input expectations are verified
+  assert:
+    that:
+      - 'hostvars.localhost.ansible_machine_id | default("", True) | trim | length'
+      - 'stone_touched == False'  # make sure it's not read-only
+      - 'touchstone_filepath | default("", True) | trim | length'
+      - 'touch_touchstone | default(False) in [True, False]'
+
+- name: Touch the touchstone
+  block:
+
+    - name: The file touchstone_filepath doesn't exist
+      command: 'cat {{ touchstone_filepath }}'
+      when: hostvars.localhost.not_checking == True
+      register: result
+      failed_when: result | success
+      # workaround lack of 'success_when'
+      until: result | failed
+      retries: 0
+      delay: 0
+
+    - name: The file touchstone_filepath contains the current uuid
+      blockinfile:
+        dest: "{{ touchstone_filepath }}"
+        create: True
+        block: |
+          Touched by {{ hostvars.localhost.ansible_nodename }}
+          Machine_id {{ hostvars.localhost.ansible_machine_id }}
+      when: hostvars.localhost.not_checking == True
+
+    - name: stone_touched is set true when touched
+      set_fact:
+        stone_touched: True
+
+  when: touch_touchstone | default(False) and
+        stone_touched == False
+
+- name: Obtain state of the touchstone
+  block:
+
+    - name: Status of touchstone_filepath is known
+      stat:
+        path: "{{ touchstone_filepath }}"
+      register: result
+      when: hostvars.localhost.not_checking == True
+
+    - name: The stone_touched flag is set True on touchstone_filepath status
+      set_fact:
+        stone_touched: True  # side-effect: This will exit the block immediatly
+      when: result.stat is defined and
+            result.stat.exists is defined and
+            result.stat.exists == True
+
+  when: not touch_touchstone | default(False) and
+        stone_touched == False

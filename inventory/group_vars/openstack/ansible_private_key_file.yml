@@ -1,0 +1,5 @@
+---
+
+# Default to playbook executors key
+ansible_private_key_file: '{{ lookup("env","ANSIBLE_PRIVATE_KEY_FILE")
+                              | default(lookup("env","HOME") ~ "/.ssh/id_rsa", True) }}'

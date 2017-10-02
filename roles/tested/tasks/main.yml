@@ -1,0 +1,16 @@
+---
+
+- name: Input expectations are verified
+  assert:
+    that:
+      - 'inventory_hostname in groups["subjects"]'
+      - 'whatyasay | default("", True) | trim | length'
+
+- name: Make subject utter some words
+  command: 'echo "{{ whatyasay }}"'
+  changed_when: True
+  register: result
+
+- name: Uttered words are shown
+  debug:
+    var: result.stdout

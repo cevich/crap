@@ -1,21 +1,29 @@
 ---
 
-# N/B: This file can be overwritten by a copy from job_path.
-
-# Required for peons to be grouped
-- hosts: kommandir
+- name: Localhost is initialized, joins all subjects to their join_groups
+  hosts: localhost
   vars_files:
-      - kommandir_vars.yml
+    - vars.yml
+  tags:
+    - run
   roles:
     - common
 
-- hosts: peons:autotested
+- name: Primary testing roles are applied
+  hosts: subjects
+  # Needed for --list-tags and --check
+  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
   vars_files:
-      - kommandir_vars.yml
+    - vars.yml
+  tags:
+    - run
   roles:
     - common
-    - peon_common
-    - role: touchstone
-      touchstone_filepath: "/var/lib/autotested_touchstone"
-    - role: autotested
-      when: stone_touched
+
+    - accessible
+
+    - touchstone
+
+    # Only do the buisness when host has fully completed all setup tags
+    - role: tested
+      when: stone_touched and whatyasay | trim | length

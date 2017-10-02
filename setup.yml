@@ -1,6 +1,93 @@
 ---
 
-# N/B: This file can be overwritten by a copy from job_path.
+- name: Localhost is initialized, joins all subjects to their join_groups
+  hosts: localhost
+  vars_files:
+      - vars.yml
+  tags:
+    - creation
+    - setup
+    - configuration
+  pre_tasks:
+    - name: Compatibility is verified
+      assert:
+        that:
+            - 'ansible_version | length'
+            - 'ansible_version.string | version_compare("2.3", ">=")'
+  roles:
+    - common
 
-- include: peon_creation.yml
-- include: peon_setup.yml
+- name: Subjects are initialized
+  hosts: subjects
+  gather_facts: False  # Inventory is incomplete
+  strategy: linear  # because of common role
+  vars_files:
+    - vars.yml
+  tags:
+    - creation
+    - setup
+    - configuration
+  roles:
+    - common  # add_host doesn't support 'free' strategy
+
+- name: Subjects are created, made accessible, and ready for Ansible
+  hosts: subjects
+  gather_facts: False  # Inventory is still incomplete
+  strategy: free  # speed is of the essence
+  vars_files:
+    - vars.yml
+  tags:
+    - creation
+    - setup
+    - configuration
+  roles:
+    - role: created
+      when: creation_command | trim | length and
+            not subject_created
+
+    - accessible
+
+    - role: subscribed
+      when: rhsm | default("", True) | trim | length and
+            rhsm.username | default("", True) | trim | length and
+            rhsm.password | default("", True) | trim | length
+
+    - ansible_dependencies
+
+- name: Subjects apply domain-specific setup roles
+  hosts: subjects
+  # Needed for --list-tags and --check
+  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
+  strategy: free  # speed is of the essence
+  vars_files:
+    - vars.yml
+  tags:
+    - setup
+    - configuration
+  pre_tasks:
+      - name: The current touchstone status is obtained
+        include_role:
+          name: touchstone
+          private: False
+  roles:
+      # domain-specific setup roles go here.
+      # when: stone_touched == False
+  post_tasks:
+      - name: The touchstone is touched, marking the end of setup.
+        include_role:
+          name: touchstone
+          private: False
+        vars:
+            touch_touchstone: True
+        when: stone_touched == False
+
+- name: Subjects apply domain-specific configuration roles
+  hosts: subjects
+  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
+  strategy: free  # speed is of the essence
+  vars_files:
+    - vars.yml
+  tags:
+    - configuration
+  roles:
+      # domain-specific configuration roles go here.

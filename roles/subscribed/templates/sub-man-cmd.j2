@@ -1,24 +1,28 @@
 {{ "/usr/bin/subscription-manager register" ~
-   " --username=$RHSM_USERNAME" ~
-   " --password=$RHSM_PASSWORD" ~
+   " --username=" ~ rhsm.username | trim | quote ~
+   " --password=" ~ rhsm.password | trim | quote ~
    " --auto-attach" }}
 
-{%- if rhsm.insecure | default(False) -%}
+{% if rhsm.insecure | default(False) %}
     {{ " --insecure" }}
-{%- endif -%}
+{% endif %}
 
-{%- if rhsm.baseurl | default(False) -%}
-    {{ " --baseurl=" ~ rhsm.baseurl }}
-{%- endif -%}
+{% if rhsm.baseurl | default('', True) | trim | length %}
+    {{ " --baseurl=" ~ rhsm.baseurl | trim | quote }}
+{% endif %}
 
-{%- if rhsm.serverurl | default(False) -%}
-    {{ " --serverurl=" ~ rhsm.serverurl }}
-{%- endif -%}
+{% if rhsm.serverurl | default('', True) | trim | length %}
+    {{ " --serverurl=" ~ rhsm.serverurl | trim | quote }}
+{% endif %}
 
-{%- if rhsm.org | default('') not in ['', None, [], {}] -%}
-    {{ " --org=$RHSM_ORG" }}
-{%- endif -%}
+{% if rhsm.org | default('', True) | trim | length %}
+    {{ " --org=" ~ rhsm.org | trim | quote }}
+{% endif %}
 
-{%- if rhsm.force | default(False) -%}
+{% if rhsm.release | default('', True) | trim | length %}
+    {{ " --release=" ~ rhsm.release | trim | quote }}
+{% endif %}
+
+{% if rhsm.force | default(False) %}
     {{ " --force" }}
-{%- endif -%}
+{% endif %}

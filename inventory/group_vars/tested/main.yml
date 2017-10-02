@@ -1,0 +1,3 @@
+---
+
+whatyasay: "{{ inventory_hostname }} BooYeah!"

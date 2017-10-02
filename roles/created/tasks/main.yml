@@ -1,0 +1,44 @@
+---
+
+- name: Input expectations are verified
+  assert:
+    that:
+        - 'inventory_hostname != "localhost"'
+        - 'creation_command is defined'
+        - 'destruction_command is defined'
+        - 'creation_destruction_environment is defined'
+        - 'creation_destruction_asserts is defined'
+
+- name: Subject's list of optional assertions is debugged
+  debug:
+    var: creation_destruction_asserts
+  when: creation_destruction_asserts | default('', True) | trim | length
+
+# Allows customized checking of jinja templates / variables in cloud_provisioning_command
+- name: Subject's list of optional creation_destruction_asserts are all true
+  assert:
+    that: '{{ creation_destruction_asserts }}'
+  when: creation_destruction_asserts | default('', True) | trim | length
+
+- name: Subject's creation_command is executed on localhost
+  command: "{{ creation_command.command }}"
+  environment: "{{ creation_destruction_environment if creation_destruction_environment | default('', True) | trim | length else {} }}"
+  args:
+    chdir: "{{ creation_command.chdir | default(playbook_dir) }}"
+    executable: "{{ creation_command.executable | default(omit) }}"
+    creates: "{{ creation_command.creates | default(omit) }}"
+    removes: "{{ creation_command.removes | default(omit) }}"
+  when: creation_command | default('', True) | trim | length
+  delegate_to: localhost
+  register: result
+
+- name: Localhost maintains subject's hostvars file
+  include_role:
+    name: host_vars_mod
+    private: False
+  vars:
+    source_role: "created"
+    # Workaround yaml/json parsing bug in some Ansible versions
+    hostvarsfile_updates: >
+      {{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json
+         | combine( {"subject_created": True } ) }}

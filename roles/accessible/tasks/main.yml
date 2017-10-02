@@ -1,0 +1,21 @@
+---
+# vim-syntax: ansible
+
+- name: Path to static or dynamic inventory is buffered
+  set_fact:
+    result: '{{ inventory_file
+                if inventory_file | default("",True) | trim | length
+                else inventory_dir }}'
+
+- name: Universal ansible accessability command is buffered
+  set_fact:
+    result: 'ansible -i "{{ result }}" -m raw -a "true" --timeout=1 {{ inventory_hostname }}'
+
+- name: Ansible is able to run 'true' on host
+  command: '{{ result }}'
+  register: result
+  changed_when: result | success
+  until: result | success
+  retries: 5
+  delay: 10
+  delegate_to: localhost

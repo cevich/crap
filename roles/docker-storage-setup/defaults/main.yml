@@ -1,4 +1,0 @@
----
-
-# Each item is a line of content to APPEND onto /etc/sysconfig/d-s-s (and latest)
-sysconfig_dss_lines: []

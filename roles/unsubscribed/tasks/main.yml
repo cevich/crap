@@ -1,21 +1,23 @@
 ---
 
-- assert:
+- name: Input expectations are verified
+  assert:
     that:
-        - '"subscribed" in group_names'
+        - 'rhsm | default("", True) | length'
+        - 'rhsm.unsubscribe | default(True)'
 
-- block:
+- name: Attempt unsubscribing, never fail the host
+  block:
 
     - name: System is  unsubscribed
       shell: subscription-manager unregister | true
       register: result
       ignore_errors: True
+      when: not_check and rhsm.unsubscribe | default(True)
 
-  always:
+  rescue:
+    - name: Any failed state cleared from all inventory hosts
+      meta: clear_host_errors
 
-    - meta: clear_host_errors
-
-- name: Result is displayed when adept_debug
-  debug:
-    var: "result"
-  when: adept_debug
+    - name: Persistent connections are reset
+      meta: reset_connection
