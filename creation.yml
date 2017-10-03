@@ -1,0 +1,43 @@
+---
+
+- name: Localhost is initialized, joins all subjects to their join_groups
+  hosts: localhost
+  vars_files:
+      - vars.yml
+  tags:
+    - creation
+  roles:
+    - common
+
+- name: Subjects are initialized
+  hosts: subjects
+  gather_facts: False  # Inventory is incomplete
+  strategy: linear  # because of common role
+  vars_files:
+    - vars.yml
+  tags:
+    - creation
+  roles:
+    - common  # add_host doesn't support 'free' strategy
+
+- name: Subjects are created, made accessible, and ready for Ansible
+  hosts: subjects
+  gather_facts: False  # Inventory is still incomplete
+  strategy: free  # speed is of the essence
+  vars_files:
+    - vars.yml
+  tags:
+    - creation
+  roles:
+    - role: created
+      when: creation_command | trim | length and
+            not subject_created
+
+    - accessible
+
+    - role: subscribed
+      when: rhsm | default("", True) | trim | length and
+            rhsm.username | default("", True) | trim | length and
+            rhsm.password | default("", True) | trim | length
+
+    - ansible_dependencies

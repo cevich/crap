@@ -1,3 +1,6 @@
 ---
 
-# This file should contain variables which should globaly override group_vars and host_vars.
+# This file should contain variables which globaly override group_vars and host_vars.
+
+# The default (for testing/playing) cloud_group is docker (roles/common/defaults/main.yml)
+# cloud_group: docker

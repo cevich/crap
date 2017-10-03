@@ -76,7 +76,7 @@ echo
         # Undo --cache-dir workaround
         export HOME="$OLD_HOME"
         # Install fixed, trusted, hashed versions of all requirements (including pip and virtualenv)
-        pip --cache-dir="$PIPCACHE" install --require-hashes \
+        pip --cache-dir="$PIPCACHE" install --force-reinstall --require-hashes \
             --requirement "$WORKSPACE/requirements.txt"
 
         # Setup trusted virtualenv using hashed binary from requirements.txt

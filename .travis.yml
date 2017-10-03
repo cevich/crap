@@ -1,0 +1,36 @@
+---
+language: python
+sudo: required
+branches:
+    only:
+        - master
+matrix:
+    fast_finish: true
+
+git:
+    submodules: false
+env:
+    global:
+        - TYPOS="'ecoh' 'roel' 'fixup!' 'squash!' 'FIXME' '<<<<<<<' '=======' '>>>>>>>'"
+        # fix vim syntax highlighting: "
+        - TAGS="creation setup configuration run cleanup"
+        # fix vim syntax highlighting: "
+        - VAP="./venv-ansible-playbook.sh"
+
+before_install:
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq realpath docker
+install:
+    # Takes care of the pip-install
+    - $VAP --version
+    # Shim into venv and run the linter
+    - env PATH=$PWD/.venv/bin:$PATH $PWD/.venv/bin/ansible-lint main.yml
+    # Make sure a check-mode run passes
+    - $VAP --check --verbose main.yml
+script:
+    # Verify playbook executes using cloud_group==docker (the default)
+    - $VAP --verbose main.yml
+    # Verify every tag is idempotent
+    - for TAG in $TAGS; do $VAP --tags $TAG main.yml; $VAP --tags $TAG main.yml; done
+    # Verify repository is left clean
+    - test "$(git status --porcelain | wc -l)" -eq "0"
