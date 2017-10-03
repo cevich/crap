@@ -23,11 +23,19 @@
                  | combine(hostvarsfile_updates | default({})) }}'
   # Fix vim syntax highlighting: '
 
+- name: This host's hostvarsfile is backed up prior to replacement
+  command: 'mv "{{ hostvarsfile }}" "{{ hostvarsfilebackup }}"'
+  delegate_to: localhost
+  when: not hostvarsfilebackup | is_file and
+        not hostvarsfilebackup | is_link
+
 - name: subject's hostvarsfile is removed prior to replacement
   file:
     path: '{{ hostvarsfile }}'
     state: absent
   delegate_to: localhost
+  when: hostvarsfilebackup | is_file or
+        hostvarsfilebackup | is_link
 
 - name: subject's hostvarsfile is replaced with updated contents
   blockinfile:

@@ -49,37 +49,26 @@
     - cleanup
   roles:
     - role: destroyed
-      when: destruction_command | default("", True) | trim | length
+      # Restoring hostvars file wipes out uuid, try destroying once only.
+      when: uuid is defined and
+            destruction_command | default("", True) | trim | length
+  post_tasks:
+    - name: Subject's hostvarsfilebackup is restored to hostvarsfile
+      command: 'mv "{{ hostvarsfilebackup }}" "{{ hostvarsfile }}"'
+      delegate_to: localhost
+      when: hostvarsfilebackup | default("", True) | trim | is_file or
+            hostvarsfilebackup | default("", True) | trim | is_link
 
-- name: Localhost resets cache and all host status for destruction
+- name: Localhost hostvarsbackup is restored last
   hosts: localhost
   vars_files:
     - vars.yml
   tags:
     - cleanup
   tasks:
-    - name: Any failed state cleared from all inventory hosts
-      meta: clear_host_errors
-      changed_when: true
-
-- name: Attempt to restore hostvarsfile from backup
-  hosts: all
-  gather_facts: False  # Don't assume all hosts are reachable
-  vars_files:
-    - vars.yml
-  tags:
-    - cleanup
-  roles:
-    - common
-  post_tasks:
-    - name: This host's hostvarsfilebackup is restored
-      copy:
-        dest: '{{ hostvarsfile }}'
-        src: '{{ hostvarsfilebackup }}'
+    - name: Localhost's hostvarsfilebackup is restored to hostvarsfile
+      command: 'mv "{{ hostvarsfilebackup }}" "{{ hostvarsfile }}"'
       delegate_to: localhost
-      when: hostvarsfilebackup | default("", True) | trim | is_file
-    - name: Old hostvarsfilebackup files are removed
-      file:
-        path: '{{ hostvarsfilebackup }}'
-        state: absent
-      delegate_to: localhost
+      when: uuid is defined and
+            (hostvarsfilebackup | default("", True) | trim | is_file or
+             hostvarsfilebackup | default("", True) | trim | is_link)

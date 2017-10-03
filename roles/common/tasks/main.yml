@@ -15,14 +15,6 @@
   set_fact:
     hostvarsfilebackup: '{{ hostvarsfile | dirname }}/.{{ hostvarsfile | basename }}~'
 
-- name: This host's hostvarsfile is backed up if no backup exists
-  copy:
-    dest: '{{ hostvarsfilebackup }}'
-    src: '{{ hostvarsfile }}'
-  delegate_to: localhost
-  when: not hostvarsfilebackup | is_file and
-        not hostvarsfile | is_link
-
 - name: Verify handling of certain incantations with this ansible version
   include: "check_mode.yml"
   when: ansible_check_mode | default(False)
@@ -91,6 +83,7 @@
       # None of these should change during play, resolve all jinja2 template values
       uuid: '{{ hostvars.localhost.uuid }}'
       hostvarsfile: '{{ hostvarsfile }}'
+      hostvarsfilebackup: '{{ hostvarsfilebackup }}'
       not_checking: "{{ not_checking | default(True) }}"
 
 - name: Critical expectations are verified

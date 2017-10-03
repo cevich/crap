@@ -40,18 +40,3 @@
 - name: Clear hostvarsfile_updates buffer
   set_fact:
     result: {}
-
-- name: Fill buffer with null behavioral_inventory_parameters as needed
-  set_fact:
-    result: '{{ result | combine({item: "DELETEME"}) }}'
-  when: item in hostvars[inventory_hostname]
-  with_items: '{{ behavioral_inventory_parameters }}'
-
-- name: Localhost maintains subject's hostvars file
-  include_role:
-    name: host_vars_mod
-    private: False
-  vars:
-    source_role: destroyed
-    # Workaround yaml/json parsing bug in some Ansible versions
-    hostvarsfile_updates: '{{ result | combine( {"subject_created": False} ) }}'

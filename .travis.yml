@@ -29,8 +29,10 @@ install:
     - $VAP --check --verbose main.yml
 script:
     # Verify playbook executes using cloud_group==docker (the default)
-    - $VAP --verbose main.yml
+    - $VAP main.yml
     # Verify every tag is idempotent
-    - for TAG in $TAGS; do $VAP --tags $TAG main.yml; $VAP --tags $TAG main.yml; done
+    - set -e; for TAG in $TAGS; do $VAP --tags $TAG main.yml; $VAP --tags $TAG main.yml; done
     # Verify repository is left clean
+    - echo "Failing if any repo. files left modified:"
+    - git diff
     - test "$(git status --porcelain | wc -l)" -eq "0"

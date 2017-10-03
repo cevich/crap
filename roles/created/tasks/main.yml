@@ -32,6 +32,11 @@
   delegate_to: localhost
   register: result
 
+- name: In case some vars. are unavailable, destruction_command is rendered + hard-coded
+  set_fact:
+    destruction_command: "{{ destruction_command | trim }}"
+  when: destruction_command | default('', True) | trim | length
+
 - name: Localhost maintains subject's hostvars file
   include_role:
     name: host_vars_mod
@@ -41,4 +46,5 @@
     # Workaround yaml/json parsing bug in some Ansible versions
     hostvarsfile_updates: >
       {{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json
-         | combine( {"subject_created": True } ) }}
+         | combine( {"subject_created": True,
+                     "destruction_command": destruction_command } ) }}
