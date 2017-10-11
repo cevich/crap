@@ -2,7 +2,7 @@
 
 - name: Verify task is running running in check-mode
   assert:
-    that: 'not_checking == False'
+    that: 'ansible_check_mode  | bool'
 
 - name: Temporary 'result' variable is cleared and set to a known value
   set_fact:

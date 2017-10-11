@@ -1,0 +1,56 @@
+---
+
+- name: Localhost verifies playbook compatibility
+  assert:
+    that:
+        - 'ansible_version | length'
+        - 'ansible_version.string | version_compare("2.3", ">=")'
+        - 'join_groups | default([], True) | length'
+        - 'subject_created | bool == True'
+        - 'uuid_gen_cmd | default("", True) | trim | length'
+
+- name: Localhost cloud_group is required, use generic "all" group.
+  set_fact:
+    cloud_group: "all"
+
+- name: The localhost's hostvarsfile variable is set
+  set_fact:
+    hostvarsfile: "{{ inventory_dir }}/host_vars/localhost.yml"
+  when: hostvarsfile is undefined
+
+- name: The ansible_check_mode variable is set when undefined
+  set_fact:
+    ansible_check_mode: "{{ ansible_check_mode | default(False) }}"
+  when: ansible_check_mode is undefined
+
+- name: Verify handling of certain incantations with this ansible version
+  include: "check_mode.yml"
+  when: ansible_check_mode
+
+- name: Localhost's collective_cloud_group variable is set when undefined
+  set_fact:
+    collective_cloud_group: '{{ default_collective_cloud_group }}'
+  when: collective_cloud_group is undefined
+
+- name: A UUID is defined for this playbook to identify created/changed resources
+  block:
+
+    - name: The canonical UUID is set for localhost
+      set_fact:
+        uuid: '{{ lookup("pipe", uuid_gen_cmd) | trim }}'
+      when: not ansible_check_mode
+
+    - name: An Ansible check-mode non-unique ID is set for testing
+      set_fact:
+        uuid: 'CHECKMODE'
+      when: ansible_check_mode
+
+  when: uuid is undefined
+
+- name: Localhost initialization is confirmed
+  assert:
+    that:
+        - 'uuid | default("", True) | trim | length'
+        - 'collective_cloud_group | default("", True) | trim | length'
+        - 'hostvarsfile | default("", True) | trim | length'
+        - 'ansible_check_mode in [True, False]'

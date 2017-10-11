@@ -1,4 +1,7 @@
 ---
 
-# Required rpms for ansible to function
-ansible_dependencies: python libselinux-python yum-utils python3-pycurl python-simplejson rsync
+# Required rpms for ansible to function, missing packages are ignored
+ansible_dependencies: >
+    python python2 libselinux-python policycoreutils-python
+    yum-utils python2-dnf python3-dnf python-pycurl python2-pycurl
+    python3-pycurl python2-simplejson python-simplejson rsync

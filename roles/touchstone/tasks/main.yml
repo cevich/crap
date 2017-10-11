@@ -11,51 +11,46 @@
       - 'stone_touched == False'  # make sure it's not read-only
       - 'touchstone_filepath | default("", True) | trim | length'
       - 'touch_touchstone | default(False) in [True, False]'
+      - '"{{ role_path }}/files/touchstone.py" | is_file'
 
-- name: Touch the touchstone
+- name: Script command-line arguments are initialized
+  set_fact:
+    result: 'touchstone.py'
+
+- name: Script command-line has --touch appended
+  set_fact:
+    result: '{{ result }} --touch'
+  when: touch_touchstone | default(False)
+
+- name: Script command-line has touchstone_filepath appended
+  set_fact:
+    result: '{{ result }} {{ touchstone_filepath }}'
+
+- name: Script command-line has content lines appended
+  set_fact:
+    result: '{{ result }} {{ item | quote }}'
+  with_items:
+    - 'Touched by {{ hostvars.localhost.ansible_nodename }}'
+    - 'Machine_id {{ hostvars.localhost.ansible_machine_id }}'
+    - 'On {{ hostvars.localhost.ansible_date_time.iso8601 }}'
+
+- name: Touchstone is modified if needed
   block:
 
-    - name: The file touchstone_filepath doesn't exist
-      command: 'cat {{ touchstone_filepath }}'
-      when: hostvars.localhost.not_checking == True
+    - name: Script is executed to modify and retrieve touchstone status
+      script: '{{ result }}'
       register: result
-      failed_when: result | success
-      # workaround lack of 'success_when'
-      until: result | failed
-      retries: 0
-      delay: 0
 
-    - name: The file touchstone_filepath contains the current uuid
-      blockinfile:
-        dest: "{{ touchstone_filepath }}"
-        create: True
-        block: |
-          Touched by {{ hostvars.localhost.ansible_nodename }}
-          Machine_id {{ hostvars.localhost.ansible_machine_id }}
-      when: hostvars.localhost.not_checking == True
+    - name: Script output expectations are verified
+      assert:
+        that: 'result.stdout | trim in ["True","False"]'
 
-    - name: stone_touched is set true when touched
+    - name: Touchstone result is converted into boolean
       set_fact:
-        stone_touched: True
+        stone_touched: '{{ result.stdout | bool }}'
 
-  when: touch_touchstone | default(False) and
-        stone_touched == False
+  when: subject_created and not ansible_check_mode
 
-- name: Obtain state of the touchstone
-  block:
-
-    - name: Status of touchstone_filepath is known
-      stat:
-        path: "{{ touchstone_filepath }}"
-      register: result
-      when: hostvars.localhost.not_checking == True
-
-    - name: The stone_touched flag is set True on touchstone_filepath status
-      set_fact:
-        stone_touched: True  # side-effect: This will exit the block immediatly
-      when: result.stat is defined and
-            result.stat.exists is defined and
-            result.stat.exists == True
-
-  when: not touch_touchstone | default(False) and
-        stone_touched == False
+- name: The stone_touched variable is debugged
+  debug:
+    var: stone_touched

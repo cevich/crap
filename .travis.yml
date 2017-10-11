@@ -13,8 +13,6 @@ env:
     global:
         - TYPOS="'ecoh' 'roel' 'fixup!' 'squash!' 'FIXME' '<<<<<<<' '=======' '>>>>>>>'"
         # fix vim syntax highlighting: "
-        - TAGS="creation setup configuration run cleanup"
-        # fix vim syntax highlighting: "
 
 before_install:
     - sudo apt-get update -qq
@@ -24,8 +22,6 @@ install:
 script:
     # Verify playbook executes using cloud_group==docker (the default)
     - ./venv-cmd.sh ansible-playbook main.yml
-    # Verify every tag is idempotent
-    - set -e; for TAG in $TAGS; do $VAP --tags $TAG main.yml; ./venv-cmd.sh ansible-playbook --tags $TAG main.yml; done
     # Verify repository is left clean
     - echo "Failing if any repo. files left modified:"
     - git diff

@@ -1,29 +1,19 @@
 ---
 
-- name: Localhost is initialized, joins all subjects to their join_groups
-  hosts: localhost
-  vars_files:
-    - vars.yml
-  tags:
-    - run
-  roles:
-    - common
+- include: '{{ playbook_dir }}/common.yml'
 
 - name: Primary testing roles are applied
   hosts: subjects
   # Needed for --list-tags and --check
-  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
   vars_files:
     - vars.yml
   tags:
     - run
   roles:
-    - common
-
     - accessible
 
     - touchstone
 
-    # Only do the buisness when host has fully completed all setup tags
+    # Only do the business when host has fully completed all setup steps
     - role: tested
-      when: stone_touched and whatyasay | trim | length
+      when: stone_touched

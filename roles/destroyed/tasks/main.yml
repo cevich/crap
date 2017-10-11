@@ -26,7 +26,7 @@
     creates: "{{ destruction_command.creates | default(omit) }}"
     removes: "{{ destruction_command.removes | default(omit) }}"
   # There are many ways this could fail, hostvarsfile update affects ultimate removal
-  ignore_errors: True
+  failed_when: False
   register: result
   when: destruction_command | default('', True) | trim | length
   delegate_to: localhost
@@ -36,7 +36,3 @@
     var: "result"
   when: cloud_destruction_command | default('', True) | trim | length and
         result | failed
-
-- name: Clear hostvarsfile_updates buffer
-  set_fact:
-    result: {}

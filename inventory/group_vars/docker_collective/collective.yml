@@ -1,0 +1,11 @@
+---
+
+collective_creation_destruction_asserts:
+  - 'uuid | default("", True) | trim | length'
+  - 'collective_names | default("", True) | trim | length'
+  - '"{{ playbook_dir }}/bin/docker_collective_create.sh" | is_file'
+  - '"{{ playbook_dir }}/bin/docker_collective_destroy.sh" | is_file'
+collective_creation_command:
+  command: "{{ playbook_dir }}/bin/docker_collective_create.sh {{ collective_names }}"
+collective_destruction_command:
+  command: "{{ playbook_dir }}/bin/docker_collective_destroy.sh {{ collective_names }}"

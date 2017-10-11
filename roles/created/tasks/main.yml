@@ -8,6 +8,7 @@
         - 'destruction_command is defined'
         - 'creation_destruction_environment is defined'
         - 'creation_destruction_asserts is defined'
+        - 'subject_created == False'
 
 - name: Subject's list of optional assertions is debugged
   debug:
@@ -32,12 +33,16 @@
   delegate_to: localhost
   register: result
 
-- name: In case some vars. are unavailable, destruction_command is rendered + hard-coded
+- name: creation_command stdout parses into a YAML dictionary
   set_fact:
-    destruction_command: "{{ destruction_command | trim }}"
-  when: destruction_command | default('', True) | trim | length
+    result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
 
-- name: Localhost maintains subject's hostvars file
+- name: important post-creation variables are defined
+  set_fact:
+     destruction_command: "{{ destruction_command | default('') | trim }}"
+  when: result | default('', True) | trim | length
+
+- name: Localhost maintains created subject's hostvars file
   include_role:
     name: host_vars_mod
     private: False
@@ -45,6 +50,11 @@
     source_role: "created"
     # Workaround yaml/json parsing bug in some Ansible versions
     hostvarsfile_updates: >
-      {{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json
-         | combine( {"subject_created": True,
-                     "destruction_command": destruction_command } ) }}
+      {{ result
+         | combine( {"subject_created": subject_created,
+                     "collective_created": False,
+                     "destruction_command": destruction_command,
+                     "join_groups": result.join_groups |
+                                    default(default_join_groups) |
+                                    union(join_groups | default([])) |
+                                    union(["subjects"]) } ) }}

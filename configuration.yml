@@ -1,25 +1,20 @@
 ---
 
-- name: Localhost is initialized, joins all subjects to their join_groups
-  hosts: localhost
-  vars_files:
-      - vars.yml
-  tags:
-    - configuration
-  roles:
-    - common
+- include: '{{ playbook_dir }}/common.yml'
 
 - name: Subjects apply domain-specific configuration roles
   hosts: subjects
-  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
   strategy: free  # speed is of the essence
   vars_files:
     - vars.yml
   tags:
     - configuration
+
   roles:
     - accessible
+
     - touchstone
-    # domain-specific configuration roles go here.
+
+    # setup-contingent, domain-specific configuration roles go here.
     # role: foo
     # when: stone_touched

@@ -12,3 +12,7 @@ creation_command:
 
 # Ansible 'shell' module arguments for destroying host
 destruction_command:
+
+# Default list of groups to set for join_groups
+default_join_groups:
+    - subjects

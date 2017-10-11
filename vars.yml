@@ -4,3 +4,6 @@
 
 # The default (for testing/playing) cloud_group is docker (roles/common/defaults/main.yml)
 # cloud_group: docker
+
+# The default (for testing/playing) collective_cloud_group is docker_collective
+# collective_cloud_group: docker_collective
