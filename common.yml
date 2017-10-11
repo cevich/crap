@@ -1,0 +1,49 @@
+---
+
+- name: Localhost is always initialized first
+  hosts: localhost
+  vars_files:
+    - vars.yml
+  tags:
+    - always
+  pre_tasks:
+
+    - name: Facts are gathered for localhost
+      setup:
+        gather_subset: network
+      when: not facts_initialized | default(False)
+
+  roles:
+
+    - role: initialized
+      when: not facts_initialized | default(False)
+
+
+- name: All hosts have a common initial state
+  hosts: all
+  vars_files:
+    - vars.yml
+  tags:
+    - always
+  pre_tasks:
+
+    - name: All hosts are available before the common role
+      meta: clear_host_errors
+      changed_when: true
+
+  roles:
+
+    - role: common
+      when: not facts_initialized | default(False)
+
+  post_tasks:
+
+    # Otherwise 'cleanup' would never do it's thing
+    - name: All hosts are available after the common role
+      meta: clear_host_errors
+      changed_when: true
+
+    - name: All hosts are initialized once per playbook run
+      set_fact:
+        facts_initialized: True
+      when: facts_initialized is undefined or not facts_initialized | bool

@@ -1,0 +1,7 @@
+---
+
+# If collective_cloud_group is not set, use this as the default
+default_collective_cloud_group: "docker_collective"
+
+# Command to generate UUID
+uuid_gen_cmd: python3 -c 'import time; print("{:x}".format(int(time.time()*1000)))'

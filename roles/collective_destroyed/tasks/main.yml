@@ -1,0 +1,36 @@
+---
+
+- name: Input expectations are verified
+  assert:
+    that:
+        - 'inventory_hostname == "localhost"'
+
+- name: List of optional collective_creation_destruction_asserts are all true
+  assert:
+    that: '{{ collective_creation_destruction_asserts | default(True) }}'
+  # Don't actually fail the task, still attempt to destroy
+  ignore_errors: True
+
+- block:
+
+    - name: collective_destruction_command is executed on localhost
+      command: "{{ collective_destruction_command.command }}"
+      environment: "{{ collective_creation_destruction_environment if collective_creation_destruction_environment | default('', True) | trim | length else {} }}"
+      args:
+        chdir: "{{ collective_destruction_command.chdir | default(playbook_dir) }}"
+        executable: "{{ collective_destruction_command.executable | default(omit) }}"
+        creates: "{{ collective_destruction_command.creates | default(omit) }}"
+        removes: "{{ collective_destruction_command.removes | default(omit) }}"
+      when: collective_destruction_command | default('', True) | trim | length
+      # Don't let failure of some cause failure of all
+      failed_when: False
+
+    - name: collectively created hostsvarsfiles are removed
+      file:
+        path: '{{ item.value.hostvarsfile }}'
+        state: absent
+      failed_when: False
+      when: item.value.collective_created | default(False) | bool
+      with_dict: '{{ hostvars }}'
+
+  when: collective_destruction_command.command | default('', True) | trim | length

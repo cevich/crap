@@ -1,16 +1,5 @@
 ---
 
-- name: Localhost verifies playbook compatibility
-  hosts: localhost
-  vars_files:
-      - vars.yml
-  tasks:
-    - name: Compatibility is verified
-      assert:
-        that:
-            - 'ansible_version | length'
-            - 'ansible_version.string | version_compare("2.3", ">=")'
-
 # Each include corresponds to a tag name
 
 - include: "{{ playbook_dir }}/creation.yml"

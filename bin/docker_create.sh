@@ -34,13 +34,11 @@ trap 'death' EXIT
 
 (
     echo
-    docker info
-    echo
-    docker pull "$FQIN"
-    echo
-    docker run --detach --name "$NAME" --cidfile="$TEMPDIR/$NAME" --entrypoint=/bin/sh $EXTRA "$FQIN" -c 'while sleep 10s; do :; done; exit'
+    docker inspect --type container -f '{{.Id}}' $NAME || \
+        docker run --detach --name "$NAME" --cidfile="$TEMPDIR/$NAME" --entrypoint=/bin/sh $EXTRA "$FQIN" -c 'while sleep 10s; do :; done; exit'
 ) &> "$TEMPDIR/docker_output.log"
 
+CID=$(docker inspect --type container -f '{{.Id}}' $NAME) || \
 CID=$(timeout --foreground --signal=9 "$TIMEOUT" bash -c "while sleep 1s; do [ -r $TEMPDIR/$NAME ] && cat $TEMPDIR/$NAME && break; done")
 
 cat << EOF > /dev/stdout

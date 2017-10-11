@@ -1,42 +1,47 @@
 ---
 
-- name: Localhost is initialized, joins all subjects to their join_groups
+- include: '{{ playbook_dir }}/common.yml'
+
+- name: Subjects are created
+  hosts: subjects
+  vars_files:
+    - vars.yml
+  tags:
+    - creation
+  roles:
+
+    - role: created
+      when: not subject_created
+
+
+- name: Localhost performs collective creation
   hosts: localhost
   vars_files:
       - vars.yml
   tags:
     - creation
   roles:
-    - common
 
-- name: Subjects are initialized
-  hosts: subjects
-  gather_facts: False  # Inventory is incomplete
-  strategy: linear  # because of common role
-  vars_files:
-    - vars.yml
-  tags:
-    - creation
-  roles:
-    - common  # add_host doesn't support 'free' strategy
+    - collective_created
 
-- name: Subjects are created, made accessible, and ready for Ansible
+- name: Collective created hosts apply common roles
+  include: '{{ playbook_dir }}/common.yml'
+
+- name: Subjects are accessible and ready for Ansible
   hosts: subjects
-  gather_facts: False  # Inventory is still incomplete
   strategy: free  # speed is of the essence
   vars_files:
     - vars.yml
   tags:
     - creation
+
   roles:
-    - role: created
-      when: creation_command | trim | length and
-            not subject_created
 
     - accessible
 
     - role: subscribed
-      when: rhsm | default("", True) | trim | length and
+      when: subject_created and
+            rhsm | default("", True) | trim | length and
             rhsm.username | default("", True) | trim | length and
             rhsm.password | default("", True) | trim | length
 

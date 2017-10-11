@@ -1,5 +1,9 @@
 ---
 
+subject_created: True
+join_groups:
+    - "all"
+    - "{{ collective_cloud_group | default('all') }}"
 ansible_host: 127.0.0.1
 ansible_connection: local
 ansible_shell_type: sh

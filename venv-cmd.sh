@@ -25,19 +25,14 @@ then
     exit 3
 fi
 
-SCRIPT_NAME=$(basename "$0")
-SCRIPT_DIR=$(dirname "$0")
-[ -n "$WORKSPACE" ] || export WORKSPACE=$(realpath "$SCRIPT_DIR")
-REQUIREMENTS="$WORKSPACE/requirements.txt"
 VENV_DIRNAME=".venv"
 LOCKTIMEOUT_MINUTES="10"
-
-if [ ! -d "$WORKSPACE" ] || [ ! -w "$WORKSPACE" ]
-then
-    echo "Not a directory or not writeable by current user ($USER): $WORKSPACE"
-    echo "Avoid this by exporting \$WORKSPACE to the path of a writeable directory."
-    exit 5
-fi
+SCRIPT_NAME=$(basename "$0")
+SCRIPT_DIR=$(dirname `realpath "$0"`)
+[ -n "$WORKSPACE" ] || export WORKSPACE="$SCRIPT_DIR"
+export WORKSPACE=$(realpath $WORKSPACE)
+mkdir -p "$WORKSPACE"
+REQUIREMENTS="$WORKSPACE/requirements.txt"
 
 # Confine this w/in the workspace
 export PIPCACHE="$WORKSPACE/.cache/pip"
@@ -46,12 +41,8 @@ mkdir -p "$PIPCACHE"
 trap 'rm -rf "$PIPCACHE" "$WORKSPACE/.venvbootstrap"' EXIT
 
 [ -n "$ARTIFACTS" ] || export ARTIFACTS="$WORKSPACE/artifacts"
-if [ ! -d "$ARTIFACTS" ] || [ ! -w "$ARTIFACTS" ]
-then
-    echo "Not a directory or not writeable by current user ($USER): $ARTIFACTS"
-    echo "Avoid this by exporting \$ARTIFACTS to the path of a writeable directory."
-    exit 7
-fi
+export ARTIFACTS=$(realpath "$ARTIFACTS")
+mkdir -p "$ARTIFACTS"
 export LOGFILEPATH="$ARTIFACTS/$SCRIPT_NAME.log"
 
 # All command failures from now on are fatal

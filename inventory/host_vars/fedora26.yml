@@ -1,6 +1,5 @@
 ---
 
 join_groups:
-    - "{{ hostvars.localhost.cloud_group | mandatory }}"
     - fedora
     - tested

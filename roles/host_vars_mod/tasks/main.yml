@@ -17,7 +17,7 @@
   set_fact:
     _updates: "{{ _updates | combine({item.key: item.value}) }}"
   when: item.value != "DELETEME"
-  no_log: True
+  no_log: not ansible_check_mode
   # Workaround yaml/json parsing bug in some ansible versions
   with_dict: '{{ (lookup("file", hostvarsfile) | from_yaml | to_json | from_json)
                  | combine(hostvarsfile_updates | default({})) }}'
@@ -26,7 +26,8 @@
 - name: This host's hostvarsfile is backed up prior to replacement
   command: 'mv "{{ hostvarsfile }}" "{{ hostvarsfilebackup }}"'
   delegate_to: localhost
-  when: not hostvarsfilebackup | is_file and
+  when: not _updates.collective_created | default(False) | bool and
+        not hostvarsfilebackup | is_file and
         not hostvarsfilebackup | is_link
 
 - name: subject's hostvarsfile is removed prior to replacement

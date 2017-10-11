@@ -1,37 +1,26 @@
 ---
 
-- name: Localhost is initialized, joins all subjects to their join_groups
-  hosts: localhost
-  vars_files:
-      - vars.yml
-  tags:
-    - setup
-  roles:
-    - common
+- include: '{{ playbook_dir }}/common.yml'
 
 - name: Subjects apply domain-specific setup roles
   hosts: subjects
-  # Needed for --list-tags and --check
-  gather_facts: "{{ hostvars is defined and hostvars.localhost.not_checking | default(False) }}"
   strategy: free  # speed is of the essence
   vars_files:
     - vars.yml
   tags:
     - setup
-  pre_tasks:
-      - name: The current touchstone status is obtained
-        include_role:
-          name: touchstone
-          private: False
   roles:
+
+    - accessible
+
+    - role: touchstone
+      vars:
+        touch_touchstone: False
+
       # domain-specific setup roles go here.
       # role: foo
-      # when: stone_touched == False
-  post_tasks:
-      - name: The touchstone is touched, marking hosts as completing setup.
-        include_role:
-          name: touchstone
-          private: False
-        vars:
-            touch_touchstone: True
-        when: stone_touched == False
+      # when: not stone_touched
+
+    - role: touchstone
+      vars:
+        touch_touchstone: true

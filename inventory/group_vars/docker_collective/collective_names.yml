@@ -1,0 +1,3 @@
+---
+
+collective_names: 'docker_collective_one_{{ uuid }} docker_collective_two_{{ uuid }}'
