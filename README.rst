@@ -21,3 +21,8 @@ Note:
     to grok all of those instead of skim.  Beyond that, playtime will be the best
     teacher:  Attempt the exercises at the end of
     `the slides <https://github.com/cevich/crap/raw/master/CRAP.pdf>`_.
+
+Though just to be sure, there is some CI involved and it's: |ci_status|
+
+.. |ci_status| image:: https://travis-ci.org/cevich/crap.svg?branch=master
+               :target: https://travis-ci.org/cevich/crap
