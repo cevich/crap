@@ -3,12 +3,13 @@
 # This wrapper-script reduces the number of dependencies needed on the control-machine
 # and always executes from a fixed-version / verified environment.  In addition to
 # the requirements for whichever ``cloud_group`` is used (docker by default), this
-# script only requires:
+# script requires:
 #
-#    python2-virtualenv gcc openssl-devel redhat-rpm-config
+#    python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel
+#    python-devel libselinux-python rsync
 #
 # Example usage
-#   $ ./venv-ansible-playbook.sh \
+#   $ ./venv-cmd ansible-playbook \
 #               --check \
 #               /path/to/crap/main.yml
 
@@ -16,7 +17,8 @@
 set -e
 
 SCRIPT_NAME=$(basename "$0")
-WORKSPACE=`realpath $(dirname "$0")`
+SCRIPT_DIR=$(dirname "$0")
+[ -n "$WORKSPACE" ] || export WORKSPACE=$(realpath "$SCRIPT_DIR")
 REQUIREMENTS="$WORKSPACE/requirements.txt"
 
 echo
@@ -35,8 +37,8 @@ fi
 
 if [ "$#" -lt "1" ]
 then
-    echo "No ansible-playbook command-line options specified."
-    echo "usage: $0 -i whatever --private-key=something --extra-vars foo=bar playbook.yml"
+    echo "No executable and command-line options specified."
+    echo "usage: $0 <COMMAND> -i whatever --private-key=something --extra-vars foo=bar"
     exit 2
 fi
 
@@ -63,7 +65,7 @@ echo
     set -x
     cd "$WORKSPACE"
     # When running more than once, make it fast by skipping the bootstrap
-    if [ ! -d "./.venv" ] || [ ! -e "./.venv/bin/pip" ]; then
+    if [ ! -d "./.venv" ] || [ ! -r "./.venv/.complete" ]; then
         # N/B: local system's virtualenv binary - uncontrolled version fixed below
         virtualenv --no-site-packages --python=python2.7 ./.venvbootstrap
         # Set up paths to install/operate out of $WORKSPACE/.venvbootstrap
@@ -77,7 +79,7 @@ echo
         export HOME="$OLD_HOME"
         # Install fixed, trusted, hashed versions of all requirements (including pip and virtualenv)
         pip --cache-dir="$PIPCACHE" install --force-reinstall --require-hashes \
-            --requirement "$WORKSPACE/requirements.txt"
+            --requirement "$SCRIPT_DIR/requirements.txt"
 
         # Setup trusted virtualenv using hashed binary from requirements.txt
         ./.venvbootstrap/bin/virtualenv --no-site-packages --python=python2.7 ./.venv
@@ -92,13 +94,14 @@ echo
     ./.venv/bin/pip install --force-reinstall --cache-dir="$PIPCACHE" --upgrade pip==9.0.1
     # Re-install from cache but validate all hashes (including on pip itself)
     ./.venv/bin/pip --cache-dir="$PIPCACHE" install --require-hashes \
-        --requirement "$WORKSPACE/requirements.txt"
-) &> "$LOGFP";
+        --requirement "$SCRIPT_DIR/requirements.txt"
+    [ -r "./.venv/.complete" ] || echo "Setup by: $@" > "./.venv/.complete"
+) &>> "$LOGFP";
 
-echo "Executing \"$WORKSPACE/.venv/bin/ansible-playbook $@\""
+echo "Executing $@"
 echo
 
 # Enter trusted virtualenv in this shell
 source $WORKSPACE/.venv/bin/activate
-ansible-playbook $@
+"$@"
 deactivate  # just in case
