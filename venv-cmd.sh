@@ -1,67 +1,82 @@
 #!/bin/bash
 
-# This wrapper-script reduces the number of dependencies needed on the control-machine
-# and always executes from a fixed-version / verified environment.  In addition to
-# the requirements for whichever ``cloud_group`` is used (docker by default), this
-# script requires:
+# This wrapper-script reduces the number of python-dependencies needed to execute a command
+# and always executes from a fixed-version / verified environment. It only requires
+# the following (or equivilent) be installed:
 #
 #    python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel
-#    python-devel libselinux-python rsync
+#    python-devel python3-pycurl python-pycurl python2-simplejson util-linux
 #
-# Example usage
-#   $ ./venv-cmd ansible-playbook \
-#               --check \
-#               /path/to/crap/main.yml
+# Example usage (where ansible is NOT already installed)
+#
+#   $ ./venv-cmd ansible-playbook --version
+#
+# N/B: You may set $WORKSPACE and/or $ARTIFACTS to control where things are written
 
 # All errors are fatal
 set -e
+
+echo
+
+if [ "$#" -lt "1" ]
+then
+    echo "No command and command-line options specified."
+    echo "usage: $0 <COMMAND> [OPTIONS...]"
+    exit 3
+fi
 
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_DIR=$(dirname "$0")
 [ -n "$WORKSPACE" ] || export WORKSPACE=$(realpath "$SCRIPT_DIR")
 REQUIREMENTS="$WORKSPACE/requirements.txt"
-
-echo
-
-if ! type -P virtualenv &> /dev/null
-then
-    echo "Could not find required 'virtualenv' binary installed on system."
-    exit 1
-fi
+VENV_DIRNAME=".venv"
+LOCKTIMEOUT_MINUTES="10"
 
 if [ ! -d "$WORKSPACE" ] || [ ! -w "$WORKSPACE" ]
 then
     echo "Not a directory or not writeable by current user ($USER): $WORKSPACE"
+    echo "Avoid this by exporting \$WORKSPACE to the path of a writeable directory."
     exit 5
-fi
-
-if [ "$#" -lt "1" ]
-then
-    echo "No executable and command-line options specified."
-    echo "usage: $0 <COMMAND> -i whatever --private-key=something --extra-vars foo=bar"
-    exit 2
 fi
 
 # Confine this w/in the workspace
 export PIPCACHE="$WORKSPACE/.cache/pip"
 mkdir -p "$PIPCACHE"
 # Don't recycle cache, it may become polluted between runs
-trap 'rm -rf "$PIPCACHE"' EXIT
+trap 'rm -rf "$PIPCACHE" "$WORKSPACE/.venvbootstrap"' EXIT
 
-export ARTIFACTS="$WORKSPACE/artifacts"
-mkdir -p "$ARTIFACTS"
-[ -d "$ARTIFACTS" ] || exit 4
-
-export LOGFP="$ARTIFACTS/$SCRIPT_NAME.log"
+[ -n "$ARTIFACTS" ] || export ARTIFACTS="$WORKSPACE/artifacts"
+if [ ! -d "$ARTIFACTS" ] || [ ! -w "$ARTIFACTS" ]
+then
+    echo "Not a directory or not writeable by current user ($USER): $ARTIFACTS"
+    echo "Avoid this by exporting \$ARTIFACTS to the path of a writeable directory."
+    exit 7
+fi
+export LOGFILEPATH="$ARTIFACTS/$SCRIPT_NAME.log"
 
 # All command failures from now on are fatal
 set -e
 echo "Bootstrapping trusted virtual environment, this may take a few minutes, depending on networking."
 echo
-echo "-----> Logs and output artifacts found under: \"$ARTIFACTS\")"
+echo "-----> Log: \"$LOGFILEPATH\")"
 echo
 
 (
+  if ! flock --nonblock 42
+  then
+      echo "Another $SCRIPT_NAME virtual environment creation process is running."
+      echo "Waiting up to $LOCKTIMEOUT_MINUTES minutes for it to exit."
+      echo
+      if ! flock --timeout $[60 * LOCKTIMEOUT_MINUTES] 42
+      then
+          echo "Could not obtain lock on virtual environment creation"
+          echo
+          exit 9
+      fi
+  fi
+  echo "Virtual environment creation lock acquired"
+  echo
+  (
     set -x
     cd "$WORKSPACE"
     # When running more than once, make it fast by skipping the bootstrap
@@ -80,13 +95,10 @@ echo
         # Install fixed, trusted, hashed versions of all requirements (including pip and virtualenv)
         pip --cache-dir="$PIPCACHE" install --force-reinstall --require-hashes \
             --requirement "$SCRIPT_DIR/requirements.txt"
-
-        # Setup trusted virtualenv using hashed binary from requirements.txt
-        ./.venvbootstrap/bin/virtualenv --no-site-packages --python=python2.7 ./.venv
+        # Setup trusted virtualenv using hashed packages from requirements.txt
+        ./.venvbootstrap/bin/virtualenv --no-site-packages --python=python2.7 "./$VENV_DIRNAME"
         # Exit untrusted virtualenv
         deactivate
-        # Remove temporary bootstrap virtualenv
-        rm -rf ./.venvbootstrap
     fi
     # Enter trusted virtualenv
     source ./.venv/bin/activate
@@ -96,12 +108,12 @@ echo
     ./.venv/bin/pip --cache-dir="$PIPCACHE" install --require-hashes \
         --requirement "$SCRIPT_DIR/requirements.txt"
     [ -r "./.venv/.complete" ] || echo "Setup by: $@" > "./.venv/.complete"
-) &>> "$LOGFP";
-
-echo "Executing $@"
-echo
+  ) &>> "$LOGFILEPATH"
+) 42>>"$LOGFILEPATH"
 
 # Enter trusted virtualenv in this shell
-source $WORKSPACE/.venv/bin/activate
+source "$WORKSPACE/$VENV_DIRNAME/bin/activate"
+echo "Executing $@"
+echo
 "$@"
 deactivate  # just in case
