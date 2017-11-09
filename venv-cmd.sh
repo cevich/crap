@@ -38,7 +38,7 @@ REQUIREMENTS="$WORKSPACE/requirements.txt"
 export PIPCACHE="$WORKSPACE/.cache/pip"
 mkdir -p "$PIPCACHE"
 # Don't recycle cache, it may become polluted between runs
-trap 'rm -rf "$PIPCACHE" "$WORKSPACE/.venvbootstrap"' EXIT
+trap 'rm -rf "$PIPCACHE" "$WORKSPACE/${VENV_DIRNAME}bootstrap"' EXIT
 
 [ -n "$ARTIFACTS" ] || export ARTIFACTS="$WORKSPACE/artifacts"
 export ARTIFACTS=$(realpath "$ARTIFACTS")
@@ -71,36 +71,42 @@ echo
     set -x
     cd "$WORKSPACE"
     # When running more than once, make it fast by skipping the bootstrap
-    if [ ! -d "./.venv" ] || [ ! -r "./.venv/.complete" ]; then
+    if [ ! -d "./$VENV_DIRNAME" ] || [ ! -r "./$VENV_DIRNAME/.complete" ]; then
         # N/B: local system's virtualenv binary - uncontrolled version fixed below
-        virtualenv --no-site-packages --python=python2.7 ./.venvbootstrap
-        # Set up paths to install/operate out of $WORKSPACE/.venvbootstrap
-        source ./.venvbootstrap/bin/activate
+        virtualenv --no-site-packages --python=python2 "./${VENV_DIRNAME}bootstrap"
+        python3 -m venv --copies "./${VENV_DIRNAME}bootstrap"
+        # Set up paths to install/operate out of $WORKSPACE/${VENV_DIRNAME}bootstrap
+        source "./${VENV_DIRNAME}bootstrap/bin/activate"
         # N/B: local system's pip binary - uncontrolled version fixed below
         # pip may not support --cache-dir, force it's location into $WORKSPACE the ugly-way
         OLD_HOME="$HOME"
         export HOME="$WORKSPACE"
-        pip install --force-reinstall --upgrade pip==9.0.1
+        pip install --force-reinstall --upgrade pip==9.0.1;
         # Undo --cache-dir workaround
         export HOME="$OLD_HOME"
         # Install fixed, trusted, hashed versions of all requirements (including pip and virtualenv)
         pip --cache-dir="$PIPCACHE" install --force-reinstall --require-hashes \
             --requirement "$SCRIPT_DIR/requirements.txt"
         # Setup trusted virtualenv using hashed packages from requirements.txt
-        ./.venvbootstrap/bin/virtualenv --no-site-packages --python=python2.7 "./$VENV_DIRNAME"
+        "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --no-site-packages --python=python2 "./$VENV_DIRNAME"
+        "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --copies "./$VENV_DIRNAME"
         # Exit untrusted virtualenv
         deactivate
     fi
     # Enter trusted virtualenv
-    source ./.venv/bin/activate
+    source "./$VENV_DIRNAME/bin/activate"
     # Upgrade stock-pip to support hashes
-    ./.venv/bin/pip install --force-reinstall --cache-dir="$PIPCACHE" --upgrade pip==9.0.1
-    # Re-install from cache but validate all hashes (including on pip itself)
-    ./.venv/bin/pip --cache-dir="$PIPCACHE" install --require-hashes \
-        --requirement "$SCRIPT_DIR/requirements.txt"
-    [ -r "./.venv/.complete" ] || echo "Setup by: $@" > "./.venv/.complete"
+    "./$VENV_DIRNAME/bin/pip" install --force-reinstall --cache-dir="$PIPCACHE" --upgrade pip==9.0.1
+    for PIP in 'python3 -m pip' 'python2 -m pip'; do
+        # Re-install from cache but validate all hashes (including on pip itself)
+        $PIP --cache-dir="$PIPCACHE" install --require-hashes \
+             --requirement "$SCRIPT_DIR/requirements.txt"; done
+    [ -r "./$VENV_DIRNAME/.complete" ] || echo "Setup by: $@" > "./$VENV_DIRNAME/.complete"
   ) &>> "$LOGFILEPATH"
 ) 42>>"$LOGFILEPATH"
+
+# Since setup is complete, only kill the bootstrap on exit
+trap 'rm -rf "$WORKSPACE/${VENV_DIRNAME}bootstrap"' EXIT
 
 # Enter trusted virtualenv in this shell
 source "$WORKSPACE/$VENV_DIRNAME/bin/activate"

@@ -1,28 +1,39 @@
 ---
+dist: trusty
 language: python
+python:
+    - "2.7"
+
 sudo: required
-branches:
-    only:
-        - master
-matrix:
-    fast_finish: true
 
 git:
     submodules: false
+
+branches:
+    only:
+        - master
+
 env:
     global:
-        - TYPOS="'ecoh' 'roel' 'fixup!' 'squash!' 'FIXME' '<<<<<<<' '=======' '>>>>>>>'"
+        - TYPOS='ecoh|roel|fixup!|squash!|FIXME|<<<<<<<|=======|>>>>>>>'
         # fix vim syntax highlighting: "
+
+matrix:
+    fast_finish: true
+    include:
+        - python: "2.7"
+          env: SUITE="Typo Check"
+        - python: "2.7"
+          env: SUITE="Unit test"
+        - python: "2.7"
+          env: SUITE="System test"
 
 before_install:
     - sudo apt-get update -qq
-    - sudo apt-get install -qq realpath docker
+    - sudo apt-get install -qq docker realpath
+
 install:
-    - ./venv-cmd.sh ./unittest.sh
+    - ./.travis.sh install
+
 script:
-    # Verify playbook executes using cloud_group==docker (the default)
-    - ./venv-cmd.sh ansible-playbook main.yml
-    # Verify repository is left clean
-    - echo "Failing if any repo. files left modified:"
-    - git diff
-    - test "$(git status --porcelain | wc -l)" -eq "0"
+    - ./.travis.sh "$SUITE"
