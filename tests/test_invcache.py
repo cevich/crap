@@ -35,7 +35,7 @@ class TestCaseBase(unittest.TestCase):
     mock_fcntl = None
 
     # repo. relative path containing test subject python file
-    SUBJECT_REL_PATH = 'inventory'
+    SUBJECT_REL_PATH = 'bin'
 
     # The name of the loaded code, as if it were a real module
     SUBJECT_NAME = TEST_FILENAME[len('test_'):].split('.',1)[0]
@@ -101,6 +101,8 @@ class TestCaseBase(unittest.TestCase):
                                MagicMock(return_value=self.TEMPDIRPATH)),
                          patch('{}.os.makedirs'.format(TestCaseBase.SUBJECT_NAME),
                                self.mock_makedirs),
+                         patch('{}.os.path.isdir'.format(TestCaseBase.SUBJECT_NAME),
+                               MagicMock(spec=os.path.isdir, return_value=False)),
                          patch('{}.os.getcwd'.format(TestCaseBase.SUBJECT_NAME),
                                MagicMock(return_value=self.TEMPDIRPATH)),
                          patch('{}.fcntl'.format(TestCaseBase.SUBJECT_NAME),
@@ -188,7 +190,7 @@ class TestToolFunctions(TestCaseBase):
 
         def failif_tmp_art(name, mode=511, exist_ok=False):
             self.assertEqual(mode, 511)
-            self.assertEqual(exist_ok, True)
+            self.assertEqual(exist_ok, False)  # Python2 doesn't have exist_ok option
             if tmp_art_ro and os.path.join(self.TEMPDIRPATH, 'artifacts') == name:
                 raise OSError('{TMP}/artifacts is read-only'.format(TMP=self.TEMPDIRPATH))
             if tmp_ro and self.TEMPDIRPATH == name:
@@ -199,14 +201,14 @@ class TestToolFunctions(TestCaseBase):
                 raise OSError('/workspace is read-only')
             if art_ro and '/artifacts' == name:
                 raise OSError('/artifacts is read-only')
-        self.mock_makedirs.side_effect=failif_tmp_art
 
+        self.mock_makedirs.side_effect=failif_tmp_art
         if raises:
             self.assertRaises(raises, self.SUBJECT.artifacts_dirpath, environ)
             return
         actual = self.SUBJECT.artifacts_dirpath(environ)
         self.assertEqual(actual, expect)
-        self.mock_makedirs.assert_any_call(name=expect, exist_ok=True)
+        self.mock_makedirs.assert_any_call(name=expect)
 
 
     def test_artifacts_dirpath(self):

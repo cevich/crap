@@ -1,8 +1,7 @@
 ---
 
-- name: Hosts are created and initialized
+- name: Control-Host and static subject-hosts are initialized
   hosts: all
-  strategy: free
   vars_files:
     - vars.yml
 
@@ -10,11 +9,7 @@
     - creation
 
   pre_tasks:
-    - name: All hosts are available for initialization
-      meta: clear_host_errors
-      changed_when: true
-
-    - name: Facts are gathered for localhost
+    - name: Facts are gathered for control-host
       setup:
         gather_subset: network
       when: "inventory_hostname == 'localhost'"
@@ -23,22 +18,13 @@
     - role: control_host
       when: "inventory_hostname == 'localhost'"
 
+    # role-order significant: Group-membership (esp. cloud-group) required for all
+    # staticly-defined subject-hosts
     - role: subject_host
-      when: "inventory_hostname != 'localhost'"
 
-    - role: created
-      when: not subject_created and
-            'subjects' in group_names and
-            creation_command | default('', True) | trim | length
 
-    - role: collective_created
-      when: inventory_hostname == 'localhost' and
-            collective_creation_command.command | default('', True) | trim | length
-
-# New play required to include any collective_created hosts
-- name: Subjects are accessible and ready for Ansible
+- name: Static and collective subbject-hosts are created
   hosts: all
-  strategy: free
   vars_files:
     - vars.yml
 
@@ -46,8 +32,26 @@
     - creation
 
   roles:
-    - role: subject_host  # did not exist, first time this ran
-      when: collective_created
+    - role: created
+      when: not subject_created | default(False) | bool and
+            not collective_created | default(False) | bool and
+            creation_command | default('', True) | trim | length
+
+    - role: collective_created
+      when: inventory_hostname == 'localhost' and
+            collective_creation_command.command | default('', True) | trim | length
+
+
+- name: Subjects are accessible and ready for Ansible
+  hosts: all
+  vars_files:
+    - vars.yml
+
+  tags:
+    - creation
+
+  roles:
+    - role: subject_host
 
     - role: accessible
 
@@ -57,3 +61,4 @@
             rhsm.password | default("", True) | trim | length
 
     - role: ansible_dependencies
+      when: "inventory_hostname != 'localhost'"

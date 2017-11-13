@@ -4,7 +4,6 @@
   assert:
     that:
         - 'ansible_check_mode in [True,False]'
-        - 'inventory_hostname != "localhost"'
         - 'ansible_dependencies | default("", True) | trim | length'
 
 - name: Low-level Ansible setup module-dependencies are installed

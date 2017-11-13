@@ -5,3 +5,6 @@
 
 - name: cevich.touchstone
   src: cevich.touchstone
+
+- name: cevich.parallel_git_repos
+  src: cevich.parallel_git_repos

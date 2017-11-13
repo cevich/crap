@@ -7,16 +7,14 @@ creation_destruction_asserts:
     - '"{{ playbook_dir }}/bin/docker_destroy.sh" | is_file'
 
 creation_command:
-    command: >
-        bin/docker_create.sh
-        {{ docker_fqin }}
-        {{ inventory_hostname }}_{{ uuid }}
-        {{ docker_extra if docker_extra | default('', True) | trim | length else '' }}
+    command: bin/docker_create.sh
+             {{ docker_fqin }}
+             {{ inventory_hostname }}_{{ uuid }}
+             {{ docker_extra if docker_extra | default('', True) | trim | length else '' }}
     chdir: "{{ playbook_dir }}"
 
 destruction_command:
-    command: >
-        bin/docker_destroy.sh
-        {{ docker_cid if docker_cid | default("", True) |
-            trim | length else inventory_hostname ~ "_" ~ uuid  }}
+    command: bin/docker_destroy.sh
+             {{ docker_cid if docker_cid | default("", True) |
+             trim | length else inventory_hostname ~ "_" ~ uuid  }}
     chdir: "{{ playbook_dir }}"

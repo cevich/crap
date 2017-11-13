@@ -3,25 +3,28 @@
 set -e
 
 usage() {
-    echo "This script requires the following (or equivilent) packages are needed:"
-    echo
-    echo "python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel"
-    echo "python-devel libselinux-python rsync yum-utils python3-pycurl python-simplejson"
-    echo
-    echo "It is intended to be executed as an argument to venv-cmd.sh"
+    echo "This script is intended to be executed by .travis.sh"
     exit 1
 }
 
 ALINT="$(type -P ansible-lint)"
 APB="$(type -P ansible-playbook)"
 
+[ -n "$ARTIFACTS" ] || usage
 [ -n "$ALINT" ] || usage
 [ -n "$APB" ] || usage
 
 set -e
 
+echo "Running Python Unittests"
 (cd tests && python3 -m unittest --failfast --buffer --verbose)
 
-$ALINT main.yml
+# TODO: Doesn't support action plugins?
+#echo "Running Ansible Linter"
+#$ALINT -v -x ANSIBLE0013,ANSIBLE0014 main.yml
 
-$APB --check --verbose main.yml
+echo "Running InvCache test playbook"
+$APB -v .ic_action_test.yml
+
+echo "Running Check-mode on main playbook"
+$APB -v --check --verbose main.yml

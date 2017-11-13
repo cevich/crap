@@ -4,15 +4,18 @@
   assert:
     that:
         - 'inventory_hostname == "localhost"'
+        - '"test" in collective_creation_destruction_asserts | union(["test"])'
+        - '"test" in collective_creation_destruction_environment | combine({"test":"test"})'
 
 - name: List of optional collective_creation_destruction_asserts are all true
   assert:
     that: '{{ collective_creation_destruction_asserts | default(True) }}'
   # Don't actually fail the task, still attempt to destroy
   ignore_errors: True
+  when: collective_creation_destruction_asserts | default('', True) | length
 
 - name: collective_destruction_command is executed on localhost
-  command: "{{ collective_destruction_command.command }}"
+  shell: "{{ collective_destruction_command.command | regex_replace('\\n', ' ') }}"
   environment: "{{ collective_creation_destruction_environment if collective_creation_destruction_environment | default('', True) | trim | length else {} }}"
   args:
     chdir: "{{ collective_destruction_command.chdir | default(playbook_dir) }}"
@@ -21,12 +24,7 @@
     removes: "{{ collective_destruction_command.removes | default(omit) }}"
   # Don't let failure of some cause failure of all
   failed_when: False
+  when: collective_destruction_command.command | default('', True) | length
 
-- name: collectively created hosts are removed
-  include_role:
-    name: invcache
-  vars:
-    ic_opr: 'delete'
-    ic_host: '{{ item.key }}'
-  when: item.value.collective_created | default(False) | bool
-  with_dict: '{{ hostvars }}'
+- name: The inventory is refreshed
+  meta: refresh_inventory

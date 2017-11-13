@@ -1,13 +1,15 @@
 ---
 
 # Dictionary of required environment variables, if any.
-collective_creation_destruction_environment:
+collective_creation_destruction_environment: {}
 
 # List of Ansible 'assert' module 'with' strings that must all be true
-collective_creation_destruction_asserts:
+collective_creation_destruction_asserts: []
 
 # Ansible 'shell' module arguments for collective-creation.
-# Expected to return a YAML list on stdout of variables for each created host.
+# Expected to return a YAML list on stdout, of host_vars dictionaries.
+# Each dictionary must include a valid value for 'inventory_hostname'.
+# Each dictionary may include a list of 'join_groups'
 collective_creation_command:
 
 # Ansible 'shell' module arguments for collective-destruction
@@ -16,5 +18,6 @@ collective_destruction_command:
 collective_default_join_groups:
     - subjects
     - tested
+    - destruction
 
 # N/B: This file is shared by both collective_created and collective_destroyed roles

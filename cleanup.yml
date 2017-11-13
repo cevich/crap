@@ -16,16 +16,14 @@
 
   roles:
     - role: unsubscribed
-      when: subject_created and
-            rhsm | default("", True) | trim | length and
+      when: rhsm | default("", True) | trim | length and
             rhsm.username | default("", True) | trim | length and
             rhsm.password | default("", True) | trim | length and
             rhsm.unsubscribe
 
 
-- name: All hosts perform their destruction roles
+- name: All hosts perform their destruction tasks
   hosts: all
-  strategy: free
   vars_files:
     - vars.yml
 
@@ -46,10 +44,24 @@
     - role: destroyed
       when: uuid is defined and
             inventory_hostname != 'localhost' and
-            "permanent" not in group_names and
-            subject_created | bool and
             not collective_created | default(False) | bool and
-            cloud_destruction_command | default('', True) | trim | length
+            destruction_command.command | default('', True) | trim | length and
+            'destruction' in group_names
 
-    - role: invcache
-      ic_opr: 'delete'
+- name: All hosts remove themselves from static inventory cache
+  hosts: all
+  vars_files:
+    - vars.yml
+
+  tags:
+    - cleanup
+
+  pre_tasks:
+    - name: All hosts are available for destruction
+      meta: clear_host_errors
+      changed_when: true
+
+  post_tasks:
+    - name: Host removes itself from static inventory cache
+      ic_delete:
+      when: "'destruction' in group_names"
