@@ -4,42 +4,48 @@
   assert:
     that:
         - 'inventory_hostname == "localhost"'
-        - 'collective_creation_destruction_asserts is defined'
-        - 'collective_creation_destruction_environment is defined'
+        - '"test" in collective_creation_destruction_asserts | union(["test"])'
+        - '"test" in collective_creation_destruction_environment | combine({"test":"test"})'
+        - '"test" in collective_default_join_groups | union(["test"])'
 
-- name: List of optional collective_creation_destruction_asserts are all true
+- name: Localhost must never fail, buffer assertion result for conditional checking
   assert:
     that: '{{ collective_creation_destruction_asserts | default(True) }}'
+  register: _collective_asserts
+  ignore_errors: True  # never fail localhost
 
-- name: collective_creation_command is executed on localhost
-  command: "{{ collective_creation_command.command }}"
-  environment: "{{ collective_creation_destruction_environment if collective_creation_destruction_environment | default('', True) | trim | length else {} }}"
-  args:
-    chdir: "{{ collective_creation_command.chdir | default(playbook_dir) }}"
-    executable: "{{ collective_creation_command.executable | default(omit) }}"
-    creates: "{{ collective_creation_command.creates | default(omit) }}"
-    removes: "{{ collective_creation_command.removes | default(omit) }}"
-  register: result
+- name: List of buffered optional collective_creation_destruction_asserts are all true
+  block:
 
-- name: collective_creation_command stdout parses into a YAML list
-  set_fact:
-    result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
+    - name: collective_creation_command is executed on localhost
+      shell: "{{ collective_creation_command.command | regex_replace('\\n', ' ') }}"
+      environment: "{{ collective_creation_destruction_environment if collective_creation_destruction_environment | default('', True) | trim | length else {} }}"
+      args:
+        chdir: "{{ collective_creation_command.chdir | default(playbook_dir) }}"
+        executable: "{{ collective_creation_command.executable | default(omit) }}"
+        creates: "{{ collective_creation_command.creates | default(omit) }}"
+        removes: "{{ collective_creation_command.removes | default(omit) }}"
+      register: result
 
-- debug: var=result
+    - name: collective_creation_command stdout parses into a YAML list of dictionaries
+      set_fact:
+        # Guarantee it forms both valid yaml and json
+        result: '{{ result.stdout | default([] | to_yaml) | from_yaml | to_json | from_json }}'
 
-- name: Host is updated in the static inventory
-  include_role:
-    name: "invcache"
-  vars:
-    ic_opr: "add"
-    ic_host: '{{ outer_item.key }}'
-    ic_vars: |
-        {{ outer_item.value | combine( {"subject_created": True,
-                                        "collective_created": True,
-                                        "join_groups": outer_item.value.join_groups |
-                                                       default(collective_default_join_groups),
-                                        "cloud_group": "all"} ) }}
-  delegate_to: localhost
-  with_dict: '{{ result }}'
-  loop_control:
-    loop_var: 'outer_item'
+    - name: Host added to the static inventory from YAML dictionary of host_vars
+      ic_add: '{{ item }}'
+      with_items: '{{ result }}'
+
+    - name: Hosts are updated in the static inventory with role facts
+      ic_update:
+        inventory_hostname: '{{ item.inventory_hostname }}'
+        subject_created: True
+        collective_created: True
+        join_groups: '{{ item.join_groups | default(collective_default_join_groups) }}'
+        cloud_group: "all"
+      with_items: '{{ result }}'
+
+    - name: The inventory is refreshed
+      meta: refresh_inventory
+
+  when: _collective_asserts | success

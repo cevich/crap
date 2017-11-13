@@ -13,11 +13,6 @@ branches:
     only:
         - master
 
-env:
-    global:
-        - TYPOS='ecoh|roel|fixup!|squash!|FIXME|<<<<<<<|=======|>>>>>>>'
-        # fix vim syntax highlighting: "
-
 matrix:
     fast_finish: true
     include:

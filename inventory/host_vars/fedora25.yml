@@ -3,3 +3,4 @@
 join_groups:
     - fedora
     - tested
+    - destruction

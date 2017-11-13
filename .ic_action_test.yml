@@ -1,0 +1,95 @@
+---
+
+- hosts: fedora26
+  gather_facts: False
+  tasks:
+    - ic_reset:
+    - meta: refresh_inventory
+    - assert:
+        that:
+            - 'hostvars.localhost.invcachevers | int == 1'
+            - 'hostvars.localhost.invcachefile | is_file'
+            - 'hostvars.fedora26.foo is undefined'
+            - 'hostvars.fedora26.sna is undefined'
+    - ic_add:
+          foo: 'bar'
+          sna:
+              foo: 1
+          join_groups:
+            - 'troublemakers'
+
+# Test new play after add
+
+- hosts: fedora26
+  gather_facts: False
+  tasks:
+    - assert:
+        that:
+            - 'hostvars.fedora26.foo is defined'
+            - 'hostvars.fedora26.sna is defined'
+            - '"troublemakers" in group_names'
+            - '"subjects" in group_names'
+            - 'hostvars.fedora26.foo == "bar"'
+            - 'hostvars.fedora26.sna.foo == 1'
+            - 'hostvars.localhost.invcachefile | is_file'
+    - ic_update:
+          foo: 'bar'
+          sna:
+              foo: 1
+          join_groups:
+            - 'troublemakers'
+      register: result
+    - assert: that='not (result | changed)'
+    - ic_delete:
+    - assert:
+        that:
+            - 'not hostvars.localhost.invcachefile | is_file'
+
+- hosts: localhost
+  gather_facts: False
+  tasks:
+    - assert:
+        that:
+            - 'hostvars.hostname_one is undefined'
+            - 'hostvars.hostname_two is undefined'
+    - set_fact:
+        result:
+            hostname_one:
+                foo: 'bar'
+                sna:
+                    foo: 1
+            hostname_two:
+                foo: 'baz'
+                sna:
+                    foo: 2
+                join_groups:
+                    - 'troublemakers'
+    - ic_update: >
+        {{ {"inventory_hostname": '{{ outer_item.key }}',
+            "extra_variable": True} | combine(outer_item.value) }}
+      with_dict: '{{ result }}'
+      loop_control:
+        loop_var: 'outer_item'
+    - assert:
+        that:
+            - 'hostvars.hostname_one is defined'
+            - 'hostvars.hostname_one.foo == "bar"'
+            - 'hostvars.hostname_one.sna.foo == 1'
+            - 'hostvars.hostname_one.extra_variable | bool'
+            - 'hostvars.hostname_two is defined'
+            - 'hostvars.hostname_two.foo == "baz"'
+            - 'hostvars.hostname_two.sna.foo == 2'
+            - 'hostvars.hostname_two.extra_variable | bool'
+            - 'hostvars.hostname_two.join_groups is undefined'
+            - '"hostname_two" in groups.troublemakers'
+    - ic_delete:
+        inventory_hostname: '{{ item.key }}'
+      with_dict: '{{ result }}'
+
+- hosts: localhost
+  gather_facts: False
+  tasks:
+    - assert:
+        that:
+            - 'invcachevers == 1'
+            - 'not invcachefile | is_file'

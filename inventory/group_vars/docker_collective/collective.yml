@@ -6,6 +6,6 @@ collective_creation_destruction_asserts:
   - '"{{ playbook_dir }}/bin/docker_collective_create.sh" | is_file'
   - '"{{ playbook_dir }}/bin/docker_collective_destroy.sh" | is_file'
 collective_creation_command:
-  command: "{{ playbook_dir }}/bin/docker_collective_create.sh {{ collective_names }}"
+  command: "{{ playbook_dir }}/bin/docker_collective_create.sh {{ uuid }} fedora:latest {{ collective_names }}"
 collective_destruction_command:
-  command: "{{ playbook_dir }}/bin/docker_collective_destroy.sh {{ collective_names }}"
+  command: "{{ playbook_dir }}/bin/docker_collective_destroy.sh {{ uuid }} {% for _name in collective_names.split(' ') %}{{ _name ~ ' ' if _name in groups.destruction else '' }}{% endfor %}"

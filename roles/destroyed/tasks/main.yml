@@ -4,7 +4,6 @@
   assert:
     that:
         - 'inventory_hostname != "localhost"'
-        - 'creation_command is defined'
         - 'destruction_command is defined'
         - 'creation_destruction_environment is defined'
         - 'creation_destruction_asserts is defined'
@@ -18,20 +17,18 @@
   when: creation_destruction_asserts | default('', True) | length
 
 - name: Subject's destruction_command is executed
-  command: "{{ destruction_command.command }}"
+  shell: "{{ destruction_command.command | regex_replace('\\n', ' ') }}"
   environment: "{{ creation_destruction_environment if creation_destruction_environment | default('', True) | trim | length else {} }}"
   args:
     chdir: "{{ destruction_command.chdir | default(playbook_dir) }}"
     executable: "{{ destruction_command.executable | default(omit) }}"
     creates: "{{ destruction_command.creates | default(omit) }}"
     removes: "{{ destruction_command.removes | default(omit) }}"
-  # There are many ways this could fail, hostvarsfile update affects ultimate removal
+  # There are many ways this could fail, allow play to attempt to continue
   failed_when: False
   register: result
   delegate_to: localhost
+  when: destruction_command | default('', True) | trim | length
 
-- name: Subjects not in permanent group, are removed
-  include_role:
-    name: invcache
-  vars:
-    ic_opr: 'delete'
+- name: The inventory is refreshed
+  meta: refresh_inventory

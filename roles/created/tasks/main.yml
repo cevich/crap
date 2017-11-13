@@ -8,7 +8,6 @@
         - 'destruction_command is defined'
         - 'creation_destruction_environment is defined'
         - 'creation_destruction_asserts is defined'
-        - 'subject_created == False'
 
 - name: Subject's list of optional assertions is debugged
   debug:
@@ -21,37 +20,35 @@
     that: '{{ creation_destruction_asserts }}'
   when: creation_destruction_asserts | default('', True) | trim | length
 
-- name: Subject's creation_command is executed on localhost
-  command: "{{ creation_command.command }}"
-  environment: "{{ creation_destruction_environment if creation_destruction_environment | default('', True) | trim | length else {} }}"
-  args:
-    chdir: "{{ creation_command.chdir | default(playbook_dir) }}"
-    executable: "{{ creation_command.executable | default(omit) }}"
-    creates: "{{ creation_command.creates | default(omit) }}"
-    removes: "{{ creation_command.removes | default(omit) }}"
-  delegate_to: localhost
-  register: result
+- block:
 
-- name: creation_command stdout parses into a YAML dictionary
-  set_fact:
-    result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
+    - name: Subject's creation_command is executed on localhost
+      shell: "{{ creation_command.command | regex_replace('\\n', ' ') }}"
+      environment: "{{ creation_destruction_environment if creation_destruction_environment | default('', True) | trim | length else {} }}"
+      args:
+        chdir: "{{ creation_command.chdir | default(playbook_dir) }}"
+        executable: "{{ creation_command.executable | default(omit) }}"
+        creates: "{{ creation_command.creates | default(omit) }}"
+        removes: "{{ creation_command.removes | default(omit) }}"
+      delegate_to: localhost
+      register: result
 
-- debug: var=result
+    - name: creation_command stdout parses into a YAML dictionary
+      set_fact:
+        # Guarantee it forms both valid yaml and json
+        result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
 
-- name: important post-creation variables are defined
-  set_fact:
-     destruction_command: "{{ destruction_command | default('') | trim }}"
-  when: result | default('', True) | trim | length
+    - name: Host is updated in the static inventory from YAML dictionary of host_vars
+      ic_update: '{{ result }}'
 
-- name: Host is updated in the static inventory
-  include_role:
-    name: "invcache"
-  vars:
-    ic_opr: "update"
-    ic_vars: |
-        {{ result | combine( {"subject_created": subject_created,
-                              "collective_created": False,
-                              "destruction_command": destruction_command,
-                              "join_groups": result.join_groups |
-                                             default(default_join_groups)} ) }}
-  delegate_to: localhost
+    - name: Host is updated in the static inventory with role facts
+      ic_update:
+        subject_created: True,
+        collective_created: False,
+        destruction_command: '{{ destruction_command | default(omit) }}'
+        join_groups: '{{ result.join_groups | default(default_join_groups) }}'
+
+  when: not subject_created | default(False)
+
+- name: The inventory is refreshed
+  meta: refresh_inventory
