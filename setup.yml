@@ -1,26 +1,27 @@
 ---
 
-- include: '{{ playbook_dir }}/common.yml'
-
 - name: Subjects apply domain-specific setup roles
   hosts: subjects
   strategy: free  # speed is of the essence
   vars_files:
     - vars.yml
+
   tags:
     - setup
+
+  pre_tasks:
+    - name: Status of setup touchstone is retrieved
+      include_role:
+        name: cevich.touchstone
+
   roles:
+    # domain-specific non-idempotent setup roles go here.
+    # role: foo
+    # when: not stone_touched
 
-    - accessible
-
-    - role: cevich.touchstone
-      vars:
-        touch_touchstone: False
-
-      # domain-specific setup roles go here.
-      # role: foo
-      # when: not stone_touched
-
-    - role: cevich.touchstone
+  post_tasks:
+    - name: The setup touchstone is touched
+      include_role:
+        name: cevich.touchstone
       vars:
         touch_touchstone: true

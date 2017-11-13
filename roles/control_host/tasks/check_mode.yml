@@ -46,8 +46,7 @@
       - 'inventory_dir | default("", True) | trim | length'
       - 'inventory_dir | is_dir'
 
-- name: Verify that hostvarsfile is defined, non-empty, and an actual file
+- name: Verify that localhost's host_vars file exists
   assert:
     that:
-      - 'hostvarsfile | default("", True) | trim | length'
-      - 'hostvarsfile | is_file'
+        - 'inventory_dir ~ "/host_vars/localhost.yml" | is_file'

@@ -1,0 +1,45 @@
+---
+
+- name: Localhost verifies playbook compatibility
+  assert:
+    that:
+        - 'inventory_hostname == "localhost"'
+        - 'ansible_version | length'
+        - 'ansible_version.string | version_compare("2.3", ">=")'
+        - 'join_groups | default([], True) | length'
+        - 'subject_created | bool == True'
+        - 'uuid_gen_cmd | default("", True) | trim | length'
+
+- name: Verify handling of certain truth incantations with this ansible version
+  include: "check_mode.yml"
+  when: ansible_check_mode | default(False)
+
+- name: The collective_cloud_group value is buffered
+  set_fact:
+    result: '{{ collective_cloud_group if collective_cloud_group | default("", True) | trim | length else default_collective_cloud_group }}'
+
+- name: Localhost runtime variables are established
+  include_role:
+    name: invcache
+  vars:
+      ic_vars:
+        cloud_group: "all"
+        hostvarsfile: "{{ inventory_dir }}/host_vars/localhost.yml"
+        ansible_check_mode: "{{ ansible_check_mode | default(False) }}"
+        collective_cloud_group: '{{ result }}'
+        uuid: '{{ lookup("pipe", uuid_gen_cmd) | trim if not ansible_check_mode | default(False) else "CHECKMODE" }}'
+        join_groups: '{{ join_groups | default([], True) | union([result]) }}'
+        subject_created: True
+        collective_created: False
+
+  when: uuid is undefined or subject_created is undefined or hostvarsfile is undefined
+
+- name: Control host initialization is confirmed
+  assert:
+    that:
+        - 'uuid | trim | length'
+        - 'collective_cloud_group | trim | length'
+        - 'ansible_check_mode in [True, False]'
+        - 'cloud_group == "all"'
+        - 'hostvarsfile | is_file'
+        - 'subject_created | bool'

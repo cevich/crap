@@ -8,16 +8,16 @@
         - 'ansible_dependencies | default("", True) | trim | length'
 
 - name: Low-level Ansible setup module-dependencies are installed
-  raw: $(type -P dnf || type -P yum || echo ) install -y {{ ansible_dependencies }} && touch "/tmp/.{{ role_path | basename }}"
+  raw: $(type -P dnf || type -P yum || echo ) install -y {{ ansible_dependencies }}
   register: result
   args:
     executable: "/bin/bash"
-    creates: "/tmp/.{{ role_path | basename }}"
-  failed_when: False  # Any missing & required packages will show up as failures in the next task
-  changed_when: result | success
+  failed_when: False  # Any missing & required packages will show up as failures in setup
+  changed_when: True
   when: not ansible_check_mode
 
 - name: Hosts facts are gathered, revealing any missing low-level Ansible dependencies
   setup:
     gather_subset: network
+  # Remote hosts not created for check-mode
   when: not ansible_check_mode

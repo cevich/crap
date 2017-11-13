@@ -4,7 +4,7 @@
   assert:
     that:
         - 'inventory_hostname != "localhost"'
-        - 'creation_command is defined'
+        - 'creation_command | trim | length'
         - 'destruction_command is defined'
         - 'creation_destruction_environment is defined'
         - 'creation_destruction_asserts is defined'
@@ -29,7 +29,6 @@
     executable: "{{ creation_command.executable | default(omit) }}"
     creates: "{{ creation_command.creates | default(omit) }}"
     removes: "{{ creation_command.removes | default(omit) }}"
-  when: creation_command | default('', True) | trim | length
   delegate_to: localhost
   register: result
 
@@ -37,24 +36,22 @@
   set_fact:
     result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
 
+- debug: var=result
+
 - name: important post-creation variables are defined
   set_fact:
      destruction_command: "{{ destruction_command | default('') | trim }}"
   when: result | default('', True) | trim | length
 
-- name: Localhost maintains created subject's hostvars file
+- name: Host is updated in the static inventory
   include_role:
-    name: host_vars_mod
-    private: False
+    name: "invcache"
   vars:
-    source_role: "created"
-    # Workaround yaml/json parsing bug in some Ansible versions
-    hostvarsfile_updates: >
-      {{ result
-         | combine( {"subject_created": subject_created,
-                     "collective_created": False,
-                     "destruction_command": destruction_command,
-                     "join_groups": result.join_groups |
-                                    default(default_join_groups) |
-                                    union(join_groups | default([])) |
-                                    union(["subjects"]) } ) }}
+    ic_opr: "update"
+    ic_vars: |
+        {{ result | combine( {"subject_created": subject_created,
+                              "collective_created": False,
+                              "destruction_command": destruction_command,
+                              "join_groups": result.join_groups |
+                                             default(default_join_groups)} ) }}
+  delegate_to: localhost
