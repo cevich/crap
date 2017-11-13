@@ -28,11 +28,10 @@
   # There are many ways this could fail, hostvarsfile update affects ultimate removal
   failed_when: False
   register: result
-  when: destruction_command | default('', True) | trim | length
   delegate_to: localhost
 
-- name: Display result if cloud_destruction_command failed
-  debug:
-    var: "result"
-  when: cloud_destruction_command | default('', True) | trim | length and
-        result | failed
+- name: Subjects not in permanent group, are removed
+  include_role:
+    name: invcache
+  vars:
+    ic_opr: 'delete'

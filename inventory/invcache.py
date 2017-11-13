@@ -209,7 +209,10 @@ class InvCache(object):
         :returns: Tuple containing a dictionary of host variables, and a list of groups.
         """
         if not groups:
-            groups = self.DEFAULT_GROUPS
+            if hostname != 'localhost':
+                groups = self.DEFAULT_GROUPS
+            else:
+                groups = ["all"]
         if not hostvars:
             hostvars = {}
         with self.locked(fcntl.LOCK_EX) as inventory:
@@ -381,7 +384,11 @@ def main(argv=None, environ=None):
         environ = os.environ  # Side-effects: this isn't a dumb-dictionary
 
     parser = argparse.ArgumentParser(description="Static inventory cache manipulator,"
-                                                 " and dynamic inventory script")
+                                                 " and dynamic inventory script",
+                                     epilog="Add/Update input may include a"
+                                            " 'join_groups' list, which will be"
+                                            " acted upon, but otherwise treated as meta-data"
+                                            " ( not an actual variable).")
     parser.add_argument('--debug', action="store_true", default=False,
                         help="Print debugging messages to stderr.")
     # All are mutually exclusive
@@ -396,7 +403,7 @@ def main(argv=None, environ=None):
     group.add_argument('-a', '--add', metavar="HOSTNAME", default=None,
                        help="Add <HOSTNAME> to inventory, {0}.".format(read_vars))
     group.add_argument('-u', '--update', metavar="HOSTNAME", default=None,
-                       help="Update or Add <HOSTNAME> in inventory, {0}.".format(read_vars))
+                       help="Update or Add <HOSTNAME> to inventory, {0}.".format(read_vars))
     group.add_argument('-d', '--delete', metavar="HOSTNAME", default=None,
                        help="Delete <HOSTNAME> from inventory")
     group.add_argument('-r', '--reset', action="store_true", default=False,

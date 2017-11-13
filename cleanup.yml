@@ -1,15 +1,20 @@
 ---
 
-- include: '{{ playbook_dir }}/common.yml'
-
-- name: Attempt to unregister any subscribed subjects
-  hosts: subjects
+- name: Attempt to unregister any subscribed hosts prior to destruction
+  hosts: all
+  strategy: free
   vars_files:
     - vars.yml
+
   tags:
     - cleanup
-  roles:
 
+  pre_tasks:
+    - name: All hosts are available for un-subscribing
+      meta: clear_host_errors
+      changed_when: true
+
+  roles:
     - role: unsubscribed
       when: subject_created and
             rhsm | default("", True) | trim | length and
@@ -18,61 +23,33 @@
             rhsm.unsubscribe
 
 
-- name: Localhost performs any collective destruction before subject destruction
-  hosts: localhost
+- name: All hosts perform their destruction roles
+  hosts: all
+  strategy: free
   vars_files:
     - vars.yml
+
   tags:
     - cleanup
-  pre_tasks:
 
-    - name: Any failed state cleared from all inventory hosts
+  pre_tasks:
+    - name: All hosts are available for destruction
       meta: clear_host_errors
       changed_when: true
 
   roles:
-
     - role: collective_destroyed
       when: uuid is defined and
-            collective_destruction_command | default('', True) | trim | length
-
-  post_tasks:
-
-    - name: Any failed state cleared from all inventory hosts
-      meta: clear_host_errors
-      changed_when: true
-
-- name: Attempt to destroy subjects and cleanup all hostvarsfiles
-  hosts: all
-  vars_files:
-    - vars.yml
-  tags:
-    - cleanup
-  pre_tasks:
-
-    - name: Any failed state cleared from all inventory hosts
-      meta: clear_host_errors
-      changed_when: true
-
-  roles:
+            inventory_hostname == 'localhost' and
+            collective_destruction_command.command | default('', True) | trim | length
 
     - role: destroyed
-      # Restoring hostvars file wipes out uuid, try destroying once only.
       when: uuid is defined and
-            "subjects" in group_names and
+            inventory_hostname != 'localhost' and
+            "permanent" not in group_names and
+            subject_created | bool and
             not collective_created | default(False) | bool and
-            destruction_command | default("", True) | trim | length
+            cloud_destruction_command | default('', True) | trim | length
 
-  post_tasks:
-
-    - name: Any failed state cleared from all inventory hosts
-      meta: clear_host_errors
-      changed_when: true
-
-    - name: hostvarsfilebackup is restored to hostvarsfile
-      command: 'mv "{{ hostvarsfilebackup }}" "{{ hostvarsfile }}"'
-      delegate_to: localhost
-      when: uuid is defined and
-            not collective_created | default(False) | bool and
-            (hostvarsfilebackup | default("", True) | trim | is_file or
-             hostvarsfilebackup | default("", True) | trim | is_link)
+    - role: invcache
+      ic_opr: 'delete'

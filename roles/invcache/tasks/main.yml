@@ -1,0 +1,47 @@
+---
+
+- name: Input expectations are verified
+  assert:
+    that:
+        - 'ic_opr in ["add", "update", "delete"]'
+        - 'ic_host | trim | length'
+        - 'ic_vars | combine({})'  # is a dictionary
+
+- debug:
+    var: '{{ item }}'
+  with_items:
+    - ic_opr
+    - ic_host
+    - ic_vars
+
+- name: Static inventory cache add/update operation is performed
+  command: 'bin/invcache.py -i yaml --{{ ic_opr }} {{ ic_host }}'
+  args:
+    chdir: '{{ playbook_dir }}'
+    stdin: '{{ ic_vars | to_yaml if ic_vars | length else omit }}'
+  changed_when: True
+  delegate_to: localhost
+  when: "ic_opr != 'delete'"
+
+- name: Static inventory cache delete operation is performed
+  command: 'bin/invcache.py --del {{ ic_host }}'
+  args:
+    chdir: '{{ playbook_dir }}'
+  changed_when: True
+  delegate_to: localhost
+  when: "ic_opr == 'delete'"
+
+- name: Variables are reloaded from cache
+  set_fact: '{{ lookup("pipe", playbook_dir ~ "/bin/invcache.py --host " ~ ic_host) | from_json }}'
+  delegate_to: '{{ ic_host }}'
+  when: not ansible_check_mode | default(False) and ic_vars | length
+
+- name: Variables are defined for check-mode
+  set_fact: '{{ ic_vars | to_yaml }}'
+  delegate_to: '{{ ic_host }}'
+  when: ansible_check_mode | default(False) and ic_vars | length
+
+- debug: var=hostvars.localhost.uuid
+
+- name: Global inventory is refreshed
+  meta: refresh_inventory

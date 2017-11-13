@@ -6,8 +6,6 @@
 
 - include: "{{ playbook_dir }}/setup.yml"
 
-- include: "{{ playbook_dir }}/configuration.yml"
-
 - include: "{{ playbook_dir }}/run.yml"
 
 - include: "{{ playbook_dir }}/cleanup.yml"

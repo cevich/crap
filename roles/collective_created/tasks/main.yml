@@ -11,47 +11,35 @@
   assert:
     that: '{{ collective_creation_destruction_asserts | default(True) }}'
 
-- block:
+- name: collective_creation_command is executed on localhost
+  command: "{{ collective_creation_command.command }}"
+  environment: "{{ collective_creation_destruction_environment if collective_creation_destruction_environment | default('', True) | trim | length else {} }}"
+  args:
+    chdir: "{{ collective_creation_command.chdir | default(playbook_dir) }}"
+    executable: "{{ collective_creation_command.executable | default(omit) }}"
+    creates: "{{ collective_creation_command.creates | default(omit) }}"
+    removes: "{{ collective_creation_command.removes | default(omit) }}"
+  register: result
 
-    - name: collective_creation_command is executed on localhost
-      command: "{{ collective_creation_command.command }}"
-      environment: "{{ collective_creation_destruction_environment if collective_creation_destruction_environment | default('', True) | trim | length else {} }}"
-      args:
-        chdir: "{{ collective_creation_command.chdir | default(playbook_dir) }}"
-        executable: "{{ collective_creation_command.executable | default(omit) }}"
-        creates: "{{ collective_creation_command.creates | default(omit) }}"
-        removes: "{{ collective_creation_command.removes | default(omit) }}"
-      register: result
+- name: collective_creation_command stdout parses into a YAML list
+  set_fact:
+    result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
 
-    - name: collective_creation_command stdout parses into a YAML list
-      set_fact:
-        result: '{{ result.stdout | default({} | to_yaml) | from_yaml | to_json | from_json }}'
+- debug: var=result
 
-    - debug: var=result
-
-    - name: collective hosts hostvarsfile exists for management
-      blockinfile:
-        path: '{{ inventory_dir }}/host_vars/{{ item.key }}.yml'
-        block: |
-            {{ item.value | combine(
-                {"subject_created": True,
-                 "collective_created": True,
-                 "join_groups": item.value.join_groups |
-                                default(collective_default_join_groups) |
-                                union(["subjects"]),
-                 "cloud_group": "all"
-                }
-               ) | to_yaml }}
-        create: True
-      with_dict: '{{ result }}'
-
-    - name: collective hosts are subjects so common may run on them
-      add_host:
-        name: '{{ item.key }}'
-        groups: '{{ item.value.join_groups |
-                                default(collective_default_join_groups) |
-                                union(["subjects"]) }}'
-        hostvarsfile: '{{ inventory_dir }}/host_vars/{{ item.key }}.yml'
-      with_dict: '{{ result }}'
-
-  when: collective_creation_command.command | default('', True) | trim | length
+- name: Host is updated in the static inventory
+  include_role:
+    name: "invcache"
+  vars:
+    ic_opr: "add"
+    ic_host: '{{ outer_item.key }}'
+    ic_vars: |
+        {{ outer_item.value | combine( {"subject_created": True,
+                                        "collective_created": True,
+                                        "join_groups": outer_item.value.join_groups |
+                                                       default(collective_default_join_groups),
+                                        "cloud_group": "all"} ) }}
+  delegate_to: localhost
+  with_dict: '{{ result }}'
+  loop_control:
+    loop_var: 'outer_item'

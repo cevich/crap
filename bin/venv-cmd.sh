@@ -25,6 +25,9 @@ then
     exit 3
 fi
 
+# Don't leave __pycache__ directories everywhere
+PYTHONDONTWRITEBYTECODE="true"
+
 VENV_DIRNAME=".venv"
 LOCKTIMEOUT_MINUTES="10"
 SCRIPT_NAME=$(basename "$0")

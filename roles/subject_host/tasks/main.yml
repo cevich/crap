@@ -1,0 +1,56 @@
+---
+
+- name: Subject hosts block on localhost initialization
+  command: '{{ playbook_dir }}/bin/invcache.py --host localhost'
+  register: result
+  failed_when: False
+  changed_when: result.stdout | from_json | attr("uuid") | default("", True) | trim | length
+  delegate_to: 'localhost'
+  until: result | changed
+  retries: 6
+  delay: 2
+
+- name: Input expectations are verified
+  assert:
+    that:
+        - 'hostvars.localhost.uuid is defined'
+        - 'hostvars.localhost.inventory_dir | is_dir'
+        - 'hostvars.localhost.inventory_dir ~ "/host_vars/" ~ inventory_hostname ~ ".yml" | is_file'
+        - 'join_groups | union([])'
+
+- name: The cloud_group variable is set from defaults when undefined
+  set_fact:
+    cloud_group: '{{ default_cloud_group }}'
+  when: cloud_group is undefined
+
+- name: Runtime variables are established
+  include_role:
+    name: invcache
+  vars:
+      ic_vars:
+        ansible_check_mode: "{{ hostvars.localhost.ansible_check_mode }}"
+        uuid: '{{ hostvars.localhost.uuid }}'
+        hostvarsfile: "{{ hostvars.localhost.inventory_dir }}/host_vars/{{ inventory_hostname }}.yml"
+        cloud_group: "{{ cloud_group }}"
+        join_groups: "{{ join_groups | union(['subjects', cloud_group]) }}"
+        subject_created: False
+        collective_created: False
+  when: subject_created is undefined or cloud_group is undefined or uuid is undefined
+
+- name: Critical expectations are verified
+  assert:
+    that:
+      - 'uuid | trim | length'
+      - 'subject_created | bool in [True, False]'
+      - 'hostvarsfile | is_file'
+      - 'ansible_check_mode | bool in [True, False]'
+      - 'cloud_group | trim | length'
+      - 'ansible_check_mode in [True, False]'
+
+- name: Important control-host facts are logged for debugging
+  debug:
+    var: '{{ item }}'
+  with_items:
+    - uuid
+    - groups
+  when: "inventory_hostname == 'localhost'"

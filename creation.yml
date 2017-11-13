@@ -1,48 +1,59 @@
 ---
 
-- include: '{{ playbook_dir }}/common.yml'
-
-- name: Subjects are created
-  hosts: subjects
+- name: Hosts are created and initialized
+  hosts: all
+  strategy: free
   vars_files:
     - vars.yml
+
   tags:
     - creation
+
+  pre_tasks:
+    - name: All hosts are available for initialization
+      meta: clear_host_errors
+      changed_when: true
+
+    - name: Facts are gathered for localhost
+      setup:
+        gather_subset: network
+      when: "inventory_hostname == 'localhost'"
+
   roles:
+    - role: control_host
+      when: "inventory_hostname == 'localhost'"
+
+    - role: subject_host
+      when: "inventory_hostname != 'localhost'"
 
     - role: created
-      when: not subject_created
+      when: not subject_created and
+            'subjects' in group_names and
+            creation_command | default('', True) | trim | length
 
+    - role: collective_created
+      when: inventory_hostname == 'localhost' and
+            collective_creation_command.command | default('', True) | trim | length
 
-- name: Localhost performs collective creation
-  hosts: localhost
-  vars_files:
-      - vars.yml
-  tags:
-    - creation
-  roles:
-
-    - collective_created
-
-- name: Collective created hosts apply common roles
-  include: '{{ playbook_dir }}/common.yml'
-
+# New play required to include any collective_created hosts
 - name: Subjects are accessible and ready for Ansible
-  hosts: subjects
-  strategy: free  # speed is of the essence
+  hosts: all
+  strategy: free
   vars_files:
     - vars.yml
+
   tags:
     - creation
 
   roles:
+    - role: subject_host  # did not exist, first time this ran
+      when: collective_created
 
-    - accessible
+    - role: accessible
 
     - role: subscribed
-      when: subject_created and
-            rhsm | default("", True) | trim | length and
+      when: rhsm | default("", True) | trim | length and
             rhsm.username | default("", True) | trim | length and
             rhsm.password | default("", True) | trim | length
 
-    - ansible_dependencies
+    - role: ansible_dependencies

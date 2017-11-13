@@ -1,19 +1,19 @@
 ---
 
-- include: '{{ playbook_dir }}/common.yml'
-
-- name: Primary testing roles are applied
+- name: Subjects perform testing roles
   hosts: subjects
   # Needed for --list-tags and --check
   vars_files:
     - vars.yml
+
   tags:
     - run
+
+  pre_tasks:
+    - name: Status of setup touchstone is retrieved
+      include_role:
+        name: cevich.touchstone
+
   roles:
-    - accessible
-
-    - cevich.touchstone
-
-    # Only do the business when host has fully completed all setup steps
     - role: tested
       when: stone_touched
