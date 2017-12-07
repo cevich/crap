@@ -13,7 +13,7 @@
 
     - accessible
 
-    - role: touchstone
+    - role: cevich.touchstone
       vars:
         touch_touchstone: False
 
@@ -21,6 +21,6 @@
       # role: foo
       # when: not stone_touched
 
-    - role: touchstone
+    - role: cevich.touchstone
       vars:
         touch_touchstone: true

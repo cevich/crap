@@ -1,7 +1,0 @@
----
-
-# When true, touch touchstone_filepath.
-touch_touchstone: False
-
-# Full/absolute path to filename used to mark state.  Must persist ON the host.
-touchstone_filepath: '{{ ansible_user_dir | default("/var/tmp") }}/.{{ playbook_dir | basename }}_touchstone'

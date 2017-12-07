@@ -12,7 +12,7 @@
   roles:
     - accessible
 
-    - touchstone
+    - cevich.touchstone
 
     # Only do the business when host has fully completed all setup steps
     - role: tested

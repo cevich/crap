@@ -1,0 +1,7 @@
+---
+
+# N/B: These are installed into galaxy_roles b/c ansible.conf
+#      roles_path setting.
+
+- name: cevich.touchstone
+  src: cevich.touchstone

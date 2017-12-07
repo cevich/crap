@@ -13,7 +13,7 @@
   roles:
     - accessible
 
-    - touchstone
+    - cevich.touchstone
 
     # setup-contingent, domain-specific configuration roles go here.
     # role: foo
