@@ -14,6 +14,8 @@ spc() {
 
 if [ "$1" == "install" ]
 then
+    rm -rf .venv
+    rm -rf .cache
     echo "Setup pet testing container"
     cat << EOF > Dockerfile
 FROM docker.io/ubuntu:latest
@@ -30,6 +32,7 @@ EOF
     trap "rm Dockerfile" EXIT
     cat Dockerfile | sudo docker build -t pet:latest -
     spc true || (cat artifacts/venv-cmd.sh.log && exit 1)
+    spc ansible-galaxy install --force --role-file=requirements.yml
 elif [ "$1" == "Typo Check" ]
 then
     echo "$(git log -1 --format=%H origin/master)" > /tmp/start;
@@ -48,6 +51,7 @@ then
     spc ansible-playbook ./main.yml
     echo "Verify repository is left clean";
     echo "Failing if any repo. files left modified:";
+    git status;
     git diff;
     test "$(git status --porcelain | wc -l)" -eq "0";
 else

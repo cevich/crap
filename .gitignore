@@ -81,5 +81,9 @@ clouds.yml
 # Virtual environment directory
 .virtualenv/
 .venvbootstrap/
-artifacts
-artifacts/.*
+!artifacts/.empty
+artifacts/
+
+# Roles installed by ansible-galaxy
+!galaxy_roles/.empty
+galaxy_roles/
