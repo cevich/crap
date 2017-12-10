@@ -8,8 +8,10 @@ spc() {
     sudo docker run -it --rm --privileged --pid host --ipc host --net host \
         -v /run:/run -v /etc/localtime:/etc/localtime \
         -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
-        -v /:/host -w /host/$PWD pet \
-        /bin/bash -c "./venv-cmd.sh $1 $2 $3 $4 $5" || exit 1
+        -v /:/host -w /host/$PWD \
+        -v /var/tmp:/var/tmp \
+        pet \
+        /bin/bash -c "./bin/venv-cmd.sh $1 $2 $3 $4 $5" || exit 1
 }
 
 if [ "$1" == "install" ]
@@ -27,7 +29,9 @@ RUN apt-get install -qq \
         python3-pycurl python-simplejson libssl-dev \
         zlib1g-dev && \
     apt-get clean
-RUN mkdir -p $PWD
+ENV WORKSPACE=/var/tmp/workspace
+RUN mkdir -p $PWD && \
+    mkdir -p /var/tmp/workspace
 EOF
     trap "rm Dockerfile" EXIT
     cat Dockerfile | sudo docker build -t pet:latest -
@@ -44,7 +48,7 @@ then
 elif [ "$1" == "Unit test" ]
 then
     echo "Run unittests";
-    spc ./unittest.sh
+    spc ./bin/unittest.sh
 elif [ "$1" == "System test" ]
 then
     echo "Verify playbook executes using the defaults";
