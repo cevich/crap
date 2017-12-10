@@ -9,7 +9,7 @@
 #
 # Example usage (where ansible is NOT already installed)
 #
-#   $ ./venv-cmd ansible-playbook --version
+#   $ ./bin/venv-cmd ansible-playbook --version
 #
 # N/B: You may set $WORKSPACE and/or $ARTIFACTS to control where things are written
 
@@ -29,10 +29,12 @@ VENV_DIRNAME=".venv"
 LOCKTIMEOUT_MINUTES="10"
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_DIR=$(dirname `realpath "$0"`)
-[ -n "$WORKSPACE" ] || export WORKSPACE="$SCRIPT_DIR"
+REPO_DIR=$(realpath "$SCRIPT_DIR/../")
+
+[ -n "$WORKSPACE" ] || export WORKSPACE="$REPO_DIR"
 export WORKSPACE=$(realpath $WORKSPACE)
 mkdir -p "$WORKSPACE"
-REQUIREMENTS="$WORKSPACE/requirements.txt"
+REQUIREMENTS="$REPO_DIR/requirements.txt"
 
 # Confine this w/in the workspace
 export PIPCACHE="$WORKSPACE/.cache/pip"
@@ -86,7 +88,7 @@ echo
         export HOME="$OLD_HOME"
         # Install fixed, trusted, hashed versions of all requirements (including pip and virtualenv)
         pip --cache-dir="$PIPCACHE" install --force-reinstall --require-hashes \
-            --requirement "$SCRIPT_DIR/requirements.txt"
+            --requirement "$REQUIREMENTS"
         # Setup trusted virtualenv using hashed packages from requirements.txt
         "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --no-site-packages --python=python2 "./$VENV_DIRNAME"
         "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --copies "./$VENV_DIRNAME"
@@ -100,7 +102,7 @@ echo
     for PIP in 'python3 -m pip' 'python2 -m pip'; do
         # Re-install from cache but validate all hashes (including on pip itself)
         $PIP --cache-dir="$PIPCACHE" install --require-hashes \
-             --requirement "$SCRIPT_DIR/requirements.txt"; done
+             --requirement "$REQUIREMENTS"; done
     [ -r "./$VENV_DIRNAME/.complete" ] || echo "Setup by: $@" > "./$VENV_DIRNAME/.complete"
   ) &>> "$LOGFILEPATH"
 ) 42>>"$LOGFILEPATH"

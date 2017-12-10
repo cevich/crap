@@ -6,7 +6,7 @@ C'mon, it's an open-source project, you weren't looking for documentation were y
 
 This repo. contains a starting-point for learning the power of the force^H^H^H^HAnsible.
 
-Initial setup:  ``./venv-cmd.sh ansible-galaxy install -r roles/requirements.yml``
+Initial setup:  ``./bin/venv-cmd.sh ansible-galaxy install -r roles/requirements.yml``
 
 It was created for a workshop targed at Red Hat Quality-assurance engineering. `The
 slide-deck <https://github.com/cevich/crap/raw/master/CRAP.pdf>`_ is intended for
