@@ -8,3 +8,6 @@
 
 - name: cevich.parallel_git_repos
   src: cevich.parallel_git_repos
+
+- name: cevich.subscribed
+  src: cevich.subscribed

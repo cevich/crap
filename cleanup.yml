@@ -15,7 +15,8 @@
       changed_when: true
 
   roles:
-    - role: unsubscribed
+    - role: cevich.subscribed
+      unsubscribe: True
       when: rhsm | default("", True) | trim | length and
             rhsm.username | default("", True) | trim | length and
             rhsm.password | default("", True) | trim | length and
