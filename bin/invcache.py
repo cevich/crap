@@ -607,7 +607,7 @@ class ActionModule(ActionBase):
         if ic_op in ('add', 'update'):
 
             # join_groups is a meta-arg, don't set it as fact
-            join_groups = task_args.pop('join_groups', None)
+            join_groups = task_args.pop('join_groups', [])
 
             if ic_op == 'add':
                 invcache.addhost(subj_host, task_args, join_groups)

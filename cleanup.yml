@@ -45,7 +45,7 @@
     - role: destroyed
       when: uuid is defined and
             inventory_hostname != 'localhost' and
-            not collective_created | default(False) | bool and
+            not collective_created | default(False, True) | bool and
             destruction_command.command | default('', True) | trim | length and
             'destruction' in group_names
 
