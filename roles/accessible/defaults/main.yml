@@ -1,0 +1,6 @@
+---
+
+accessable_test_cmds:
+    - "/bin/true"
+accessable_retries: '5'
+accessable_delay: '10'

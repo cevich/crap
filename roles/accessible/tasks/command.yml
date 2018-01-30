@@ -1,0 +1,10 @@
+---
+# vim-syntax: ansible
+
+- name: Ansible accessability command is executed
+  raw: '{{ accessable_test_cmd }}'
+  changed_when: False  # inspection only
+  register: result
+  until: result | success
+  retries: '{{ accessable_retries | int }}'
+  delay: '{{ accessable_delay | int }}'
