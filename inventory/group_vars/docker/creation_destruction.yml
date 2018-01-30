@@ -15,6 +15,6 @@ creation_command:
 
 destruction_command:
     command: bin/docker_destroy.sh
-             {{ docker_cid if docker_cid | default("", True) |
-             trim | length else inventory_hostname ~ "_" ~ uuid  }}
+             {{ docker_cid if docker_cid | default("", True) | trim | length
+                else inventory_hostname ~ "_" ~ uuid  }}
     chdir: "{{ playbook_dir }}"

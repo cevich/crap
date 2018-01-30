@@ -1,6 +1,6 @@
 ---
 
-- name: Control-Host and static subject-hosts are initialized
+- name: Control-Host and subject-hosts are created and initialized
   hosts: all
   vars_files:
     - vars.yml
@@ -18,31 +18,23 @@
     - role: control_host
       when: "inventory_hostname == 'localhost'"
 
-    # role-order significant: Group-membership (esp. cloud-group) required for all
-    # staticly-defined subject-hosts
     - role: subject_host
-
-
-- name: Static and collective subbject-hosts are created
-  hosts: all
-  vars_files:
-    - vars.yml
-
-  tags:
-    - creation
-
-  roles:
-    - role: created
-      when: not subject_created | default(False) | bool and
-            not collective_created | default(False) | bool and
-            creation_command | default('', True) | trim | length
+      when: "inventory_hostname == 'localhost'"
 
     - role: collective_created
       when: inventory_hostname == 'localhost' and
             collective_creation_command.command | default('', True) | trim | length
 
+    - role: subject_host
+      when: "inventory_hostname != 'localhost'"
 
-- name: Subjects are accessible and ready for Ansible
+    - role: created
+      when: not subject_created | default(False) | bool and
+            not collective_created | default(False) | bool and
+            creation_command | default('', True) | trim | length
+
+
+- name: Updated inventory subjects are accessible and ready for Ansible
   hosts: all
   vars_files:
     - vars.yml
@@ -50,9 +42,11 @@
   tags:
     - creation
 
-  roles:
-    - role: subject_host
+  pre_tasks:
+    - name: Inventory is refreshed to ensure consistent runtime state
+      meta: refresh_inventory
 
+  roles:
     - role: accessible
 
     - role: cevich.subscribed
