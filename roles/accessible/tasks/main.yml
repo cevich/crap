@@ -1,10 +1,22 @@
 ---
 # vim-syntax: ansible
 
-- name: Ansible universal accessability command is executed
-  raw: "/bin/true"
-  register: result
-  changed_when: result | success
-  until: result | success
-  retries: 5
-  delay: 10
+- block:
+
+    - name: Ansible accessability commands are executed
+      include_tasks: command.yml
+      with_items: '{{ accessable_test_cmds }}'
+      loop_control:
+        loop_var: accessable_test_cmd
+
+  always:
+
+    - name: Command result is debugged when it fails
+      debug:
+        var: result.results[-1]
+      when: result | failed
+
+    - name: Host fails when command retries exhausted
+      fail:
+        msg: Unable to verify accessability of {{ inventory_hostname }}
+      when: result | failed
