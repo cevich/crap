@@ -13,6 +13,7 @@ spc() {
     # Dunno why $@ doesn't work here for some reason
     echo "Executing ./venv-cmd.sh $1 $2 $3 $4 $5"
     sudo docker run -it --rm --privileged --pid host --ipc host --net host \
+        -e PYTHON3SUPPORT=true \
         -v /run:/run -v /etc/localtime:/etc/localtime \
         -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
         -v /:/host -w /host/$PWD \

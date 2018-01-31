@@ -1,10 +1,14 @@
 #!/bin/bash
 
 # This wrapper-script reduces the number of python-dependencies needed to execute a command
-# and always executes from a fixed-version / verified environment. It only requires
-# the following (or equivilent) be installed:
+# and always executes from a fixed-version / verified environment. This means, no matter
+# what happens on the host package-wise, the nested command should behave in a very predictable
+# way (including, known bugs).  The last part is important, because under many CI/CD situations,
+# it's not possible to have much control over what happens on the OS-side, only within a process.
 #
-#    python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel
+# It only requires the following (or equivalent) be installed for all platforms (unless I missed one):
+#
+#    python34 python34-devel python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel
 #    python-devel python3-pycurl python-pycurl python2-simplejson util-linux
 #
 # Example usage (where ansible is NOT already installed)
@@ -17,7 +21,6 @@
 set -e
 
 echo
-
 if [ "$#" -lt "1" ]
 then
     echo "No command and command-line options specified."
@@ -27,37 +30,75 @@ fi
 
 # Don't leave __pycache__ directories everywhere
 PYTHONDONTWRITEBYTECODE="true"
-
+PYTHON3SUPPORT="${PYTHON3SUPPORT:-false}"
 VENV_DIRNAME=".venv"
 LOCKTIMEOUT_MINUTES="10"
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_DIR=$(dirname `realpath "$0"`)
 REPO_DIR=$(realpath "$SCRIPT_DIR/../")
+MACHINEID=$(cat /etc/machine-id || hostname | sha256sum | awk '{print $1}')
+MARKERFILE="./$VENV_DIRNAME/.${MACHINEID}_complete"
 
-[ -n "$WORKSPACE" ] || export WORKSPACE="$REPO_DIR"
+export WORKSPACE="${WORKSPACE:-$REPO_DIR}"
 export WORKSPACE=$(realpath $WORKSPACE)
-mkdir -p "$WORKSPACE"
-REQUIREMENTS="$REPO_DIR/requirements.txt"
-
-# Confine this w/in the workspace
 export PIPCACHE="$WORKSPACE/.cache/pip"
-mkdir -p "$PIPCACHE"
-# Don't recycle cache, it may become polluted between runs
-trap 'rm -rf "$PIPCACHE" "$WORKSPACE/${VENV_DIRNAME}bootstrap"' EXIT
+mkdir -p "$WORKSPACE"
 
-[ -n "$ARTIFACTS" ] || export ARTIFACTS="$WORKSPACE/artifacts"
+export ARTIFACTS="${ARTIFACTS:-$WORKSPACE/artifacts}"
 export ARTIFACTS=$(realpath "$ARTIFACTS")
 mkdir -p "$ARTIFACTS"
 export LOGFILEPATH="$ARTIFACTS/$SCRIPT_NAME.log"
 
+REQUIREMENTS="$REPO_DIR/requirements.txt"
+BSREQ="$(mktemp -p "" $(basename $0)_XXXX)"
+cat << EOF > "$BSREQ"
+pip==9.0.1 --hash=sha256:690b762c0a8460c303c089d5d0be034fb15a5ea2b75bdf565f40421f542fefb0
+virtualenv==15.1.0 --hash=sha256:39d88b533b422825d644087a21e78c45cf5af0ef7a99a1fc9fbb7b481e5c85b0
+EOF
+# (Line-delineated)
+CLEANUP_PATHS="$BSREQ
+$PIPCACHE
+$WORKSPACE/${VENV_DIRNAME}bootstrap
+$WORKSPACE/${VENV_DIRNAME}"
+
+cleanup() {
+    RET2="$?"  # prior exit code
+    set +x
+    set -e
+    echo "$CLEANUP_PATHS" |
+    while read LINE
+    do
+        rm -rf "$LINE"
+    done
+    if [ "${RET2:-1}" -ne "0" ]
+    then
+        echo "Exiting: $RET2"
+        exit $RET2
+    fi
+}
+
+handle_log_and_cleanup() {
+    RET="$?"  # prior exit code
+    set +x
+    set -e
+    cleanup
+    if [ "${RET:-2}" -ne "0" ]
+    then
+        echo "An error ($RET) occurred, displaying log contents:"
+        cat "$LOGFILEPATH"
+        exit ${RET:-3}
+    fi
+}
+trap handle_log_and_cleanup EXIT
+
 # All command failures from now on are fatal
-set -e
 echo "Bootstrapping trusted virtual environment, this may take a few minutes, depending on networking."
 echo
 echo "-----> Log: \"$LOGFILEPATH\")"
 echo
 
 (
+  set -e
   if ! flock --nonblock 42
   then
       echo "Another $SCRIPT_NAME virtual environment creation process is running."
@@ -72,11 +113,14 @@ echo
   fi
   echo "Virtual environment creation lock acquired"
   echo
+  set -ex
   (
-    set -x
     cd "$WORKSPACE"
     # When running more than once, make it fast by skipping the bootstrap
-    if [ ! -d "./$VENV_DIRNAME" ] || [ ! -r "./$VENV_DIRNAME/.complete" ]; then
+    if [ ! -d "./$VENV_DIRNAME" ] || [ ! -r "$MARKERFILE" ]
+    then  # Don't allow previously broken cache to break fresh setup
+        rm -rf "$PIPCACHE"
+        rm -rf "$VENV_DIRNAME"
         # N/B: local system's virtualenv binary - uncontrolled version fixed below
         virtualenv --no-site-packages --python=python2 "./${VENV_DIRNAME}bootstrap"
         python3 -m venv --copies "./${VENV_DIRNAME}bootstrap"
@@ -86,32 +130,36 @@ echo
         # pip may not support --cache-dir, force it's location into $WORKSPACE the ugly-way
         OLD_HOME="$HOME"
         export HOME="$WORKSPACE"
-        pip install --force-reinstall --upgrade pip==9.0.1;
+        # Newer pip required to support hash-checking
+        pip install --force-reinstall --upgrade pip==9.0.1
         # Undo --cache-dir workaround
         export HOME="$OLD_HOME"
-        # Install fixed, trusted, hashed versions of all requirements (including pip and virtualenv)
-        pip --cache-dir="$PIPCACHE" install --force-reinstall --require-hashes \
-            --requirement "$REQUIREMENTS"
-        # Setup trusted virtualenv using hashed packages from requirements.txt
+        # Install fixed, trusted, hashed versions of pip and virtualenv
+        ARGS="--cache-dir="$PIPCACHE" install --force-reinstall --require-hashes --isolated --requirement"
+        pip $ARGS "$BSREQ"
+        [ "$PYTHON3SUPPORT" == 'false' ] || \
+            python3 -m pip $ARGS "$BSREQ"
+        # Setup trusted virtualenv using hashed packages from $REQUIREMENTS
+        [ "$PYTHON3SUPPORT" == 'false' ] || \
+            "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --copies "./$VENV_DIRNAME"
         "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --no-site-packages --python=python2 "./$VENV_DIRNAME"
-        "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --copies "./$VENV_DIRNAME"
-        # Exit untrusted virtualenv
-        deactivate
     fi
-    # Enter trusted virtualenv
+    echo "$@" > "$MARKERFILE"  # $VENV_DIRNAME and $PIPCACHE are now trusted
+
+    # Enter trusted virtualenv with trusted cache
     source "./$VENV_DIRNAME/bin/activate"
-    # Upgrade stock-pip to support hashes
-    "./$VENV_DIRNAME/bin/pip" install --force-reinstall --cache-dir="$PIPCACHE" --upgrade pip==9.0.1
-    for PIP in 'python3 -m pip' 'python2 -m pip'; do
-        # Re-install from cache but validate all hashes (including on pip itself)
-        $PIP --cache-dir="$PIPCACHE" install --require-hashes \
-             --requirement "$REQUIREMENTS"; done
-    [ -r "./$VENV_DIRNAME/.complete" ] || echo "Setup by: $@" > "./$VENV_DIRNAME/.complete"
+    # Install actual reqirements
+    ARGS="--cache-dir="$PIPCACHE" install --require-hashes --isolated --requirement"
+    pip $ARGS "$REQUIREMENTS"
+    [ "$PYTHON3SUPPORT" == 'false' ] || \
+        python3 -m pip $ARGS "$REQUIREMENTS"
   ) &>> "$LOGFILEPATH"
 ) 42>>"$LOGFILEPATH"
 
-# Since setup is complete, only kill the bootstrap on exit
-trap 'rm -rf "$WORKSPACE/${VENV_DIRNAME}bootstrap"' EXIT
+# Since setup is complete, preserve environment and cache on exit
+CLEANUP_PATHS="$BSREQ
+$WORKSPACE/${VENV_DIRNAME}bootstrap"
+trap cleanup EXIT
 
 # Enter trusted virtualenv in this shell
 source "$WORKSPACE/$VENV_DIRNAME/bin/activate"
