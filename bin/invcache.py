@@ -452,8 +452,9 @@ def main(argv=None, environ=None):
     # InvCache API optional
     parser.add_argument('-f', '--format', choices=('json', 'yaml'), default='json',
                         metavar="FORMAT",
-                        help="Use alternate format <FORMAT>, when {0}"
-                             " for --add or --update <HOSTNAME>.")
+                        help="Use alternate format <FORMAT>, when called"
+                             " to --add or --update <HOSTNAME>.  Supported"
+                             " formats are 'json' and 'yaml'.")
     parser.add_argument('-c', '--cache', default=None, metavar="FILEPATH",
                         help="Force use of back-end cache file at <FILEPATH>")
 

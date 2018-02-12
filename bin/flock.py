@@ -14,7 +14,7 @@ from fcntl import flock, LOCK_UN, LOCK_SH, LOCK_EX, LOCK_NB
 from errno import EACCES, EAGAIN
 from contextlib import contextmanager
 
-
+dbgmsg = logging.debug
 random.seed(os.urandom(64))
 
 
@@ -53,7 +53,7 @@ class Flock(object):
         if lockfilepath is None:
             lockfilepath = os.path.join(self.def_path, self.def_prefix + self.def_suffix)
         self._lockfile = open(lockfilepath, 'a+b', 0)  # No truncate existing
-        logging.debug("Prepared lock file %s", self._lockfile.name)
+        dbgmsg("Prepared lock file %s", self._lockfile.name)
         self._lockfile.close()  # when open, is_locked() == True
 
     def __del__(self):
@@ -92,20 +92,20 @@ class Flock(object):
         :returns: File-like object if lock was acquired, None if not.
         """
         timeout = float(timeout)
-        logging.debug("(Timeing after %0.4f seconds)", timeout)
+        dbgmsg("(Timeing after %0.4f seconds)", timeout)
         timedout = time() + timeout
         while time() < timedout:
             try:
                 lockfile = self.lock(op | LOCK_NB)
                 timedout = 0
                 break
-            except IOError, xcept:
+            except IOError as xcept:
                 if xcept.errno not in [EACCES, EAGAIN]:
                     raise
             # Don't busy wait for fixed times (avoids clashes)
             sleep(0.01 + (random.randrange(0, 100) / 100))
         if bool(timedout):
-            logging.debug("(Timed out)")
+            dbgmsg("(Timed out)")
             return None
         return lockfile
 
@@ -132,16 +132,16 @@ class Flock(object):
         # If non-blocking lock can be acquired, lock is not held by any process
         locked = False
         try:
-            logging.debug("Test-acquiring to check locked state...")
+            dbgmsg("Test-acquiring to check locked state...")
             self.lock(LOCK_EX | LOCK_NB)
             locked = False
-        except IOError, xcept:
+        except IOError as xcept:
             if xcept.errno not in [EACCES, EAGAIN]:
                 raise
             locked = True
         finally:  # Always, immediatly unlock
             self.unlock()
-            logging.debug("...test-acquire complete.")
+            dbgmsg("...test-acquire complete.")
         return locked
 
     @contextmanager
@@ -149,15 +149,15 @@ class Flock(object):
         # __enter__
         start = time()
         lockfile = self.lock(op)
-        logging.info("    %d acquired %s lock in %0.4fs",
-                     os.getpid(), name, time() - start)
+        dbgmsg("    %d acquired %s lock in %0.4fs",
+               os.getpid(), name, time() - start)
         try:
             yield open(lockfile.name, 'rb')
         finally:
             # __exit__
             self.unlock()
             lockfile.close()
-            logging.debug("    %d %s lock released, held for %0.4fs",
+            dbgmsg("    %d %s lock released, held for %0.4fs",
                           os.getpid(), name, time() - start)
 
     def acquire_read(self):
@@ -181,19 +181,19 @@ class Flock(object):
         # __enter__
         start = time()
         lockfile = self.lock_timeout(timeout, op)
-        logging.info("    %d acquired %s lock before timeout, waited %0.4fs",
+        dbgmsg("    %d acquired %s lock before timeout, waited %0.4fs",
                      os.getpid(), name, time() - start)
         if lockfile:
             yield open(lockfile.name, 'rb')
         else:
-            logging.error("    %d timedout acquiring %s lock after %0.4fs",
-                          os.getpid(), name, time() - start)
+            dbgmsg("    %d timedout acquiring %s lock after %0.4fs",
+                   os.getpid(), name, time() - start)
             yield None
         # __exit__
         if lockfile:
             self.unlock()
             lockfile.close()
-            logging.debug("    %d %s lock released, held for %0.4fs",
+            dbgmsg("    %d %s lock released, held for %0.4fs",
                           os.getpid(), name, time() - start)
 
     def timeout_acquire_read(self, timeout):
@@ -213,13 +213,17 @@ class Flock(object):
         return self._timeout_acquire(timeout, LOCK_EX, "write")
 
 
+# Everything below is for testing purposes (run the script) because
+# testing shared-locking via unittest & mock is a PITA
+
+
 def _umpa_lumpa(n):
     # Don't all try to do locking all at once
     sleep(1 + float(random.randrange(0, 100) / 100))
     _flock = Flock('/tmp/doopitydoo.lock')
     method = random.choice([_flock.acquire_read, _flock.acquire_write])
     with method():
-        logging.info("    %d(%d) is doing some important work", n, os.getpid())
+        dbgmsg("    %d(%d) is doing some important work", n, os.getpid())
         sleep(1 + float(random.randrange(0, 100) / 100))
 
 
@@ -233,7 +237,7 @@ def _make_candy():
     random.shuffle(procs)
     for proc in procs:
         proc.join()
-    logging.info("MOARRRSUGARRRRR!")
+    dbgmsg("MOARRRSUGARRRRR!")
 
 
 if __name__ == '__main__':
@@ -241,7 +245,7 @@ if __name__ == '__main__':
         LOGGER = logging.getLogger()
         # Lower to DEBUG for massively detailed output
         LOGGER.setLevel(logging.DEBUG)
-        logging.info("Charlie?")
+        dbgmsg("Charlie?")
         _make_candy()
     finally:
         os.unlink('/tmp/doopitydoo.lock')

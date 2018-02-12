@@ -87,3 +87,6 @@ artifacts/
 # Roles installed by ansible-galaxy
 !galaxy_roles/.empty
 galaxy_roles/
+
+# Context file dropped by bin/pile.py
+.pile.json

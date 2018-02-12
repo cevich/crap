@@ -42,7 +42,6 @@ RUN mkdir -p $PWD && \
 VOLUME ["$WORKSPACE"]
 EOF
     cat /tmp/Dockerfile | sudo docker build -t pet:latest -
-    spc ansible-galaxy install --force --role-file=requirements.yml
 elif [ "$1" == "Typo Check" ]
 then
     TYPOS='ec-oh | ro-el | FI-XME'

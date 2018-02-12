@@ -3,15 +3,15 @@
 # This wrapper-script reduces the number of python-dependencies needed to execute a command
 # and always executes from a fixed-version / verified environment. This means, no matter
 # what happens on the host package-wise, the nested command should behave in a very predictable
-# way (including, known bugs).  The last part is important, because under many CI/CD situations,
-# it's not possible to have much control over what happens on the OS-side, only within a process.
+# way (including, known bugs).  The last part is important, because bugs can be worked around
+# easier than unpredictable code-changes.
 #
 # It only requires the following (or equivalent) be installed for all platforms (unless I missed one):
 #
 #    python34 python34-devel python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel
 #    python-devel python3-pycurl python-pycurl python2-simplejson util-linux
 #
-# Example usage (where ansible is NOT already installed)
+# Example usage:
 #
 #   $ ./bin/venv-cmd ansible-playbook --version
 #
@@ -161,8 +161,15 @@ CLEANUP_PATHS="$BSREQ
 $WORKSPACE/${VENV_DIRNAME}bootstrap"
 trap cleanup EXIT
 
-# Enter trusted virtualenv in this shell
 source "$WORKSPACE/$VENV_DIRNAME/bin/activate"
+
+if [[ -r "$WORKSPACE/requirements.yml" ]] && [[ ! -r "$WORKSPACE/galaxy-roles/.installed" ]]
+then
+    echo "Installing Ansible-Galaxy Roles from requirements.yml"
+    ansible-galaxy install --roles-path="$WORKSPACE/galaxy_roles" --role-file="$WORKSPACE/requirements.yml"
+    touch "$WORKSPACE/galaxy-roles/.installed"
+fi
+
 echo "Executing $@"
 echo
 "$@"

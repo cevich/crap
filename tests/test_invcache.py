@@ -2,28 +2,21 @@
 
 import sys
 import os
-import tempfile
-import fcntl
 import json
-import shutil
-import subprocess
-from errno import ESRCH
-from io import StringIO, SEEK_SET
-from contextlib import contextmanager, redirect_stdout, redirect_stderr
+import tempfile
+from io import StringIO
+import fcntl
 import unittest
-from unittest.mock import MagicMock, patch, mock_open, call, create_autospec, ANY
-from glob import glob
-import importlib.machinery
-from pdb import Pdb
-
-# Assumes directory structure as-is from repo. clone
-TEST_FILENAME = os.path.basename(os.path.realpath(__file__))
-TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
-TESTS_DIR_PARENT = os.path.realpath(os.path.join(TESTS_DIR, '../'))
+from contextlib import redirect_stdout, redirect_stderr
+from unittest.mock import MagicMock, patch, mock_open, create_autospec
+from unittestlib import TestCaseSubBase
 
 
-class TestCaseBase(unittest.TestCase):
-    """Exercize code from file based on TEST_FILENAME in TESTS_DIR_PARENT + SUBJECT_REL_PATH"""
+class TestCaseBase(TestCaseSubBase):
+    # Assumes directory structure as-is from repo. clone
+    TEST_FILENAME = os.path.basename(os.path.realpath(__file__))
+    TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
+    TESTS_DIR_PARENT = os.path.realpath(os.path.join(TESTS_DIR, '../'))
 
     # Mock'd call for opening files, used for patching
     MockOpen = mock_open()
@@ -34,42 +27,8 @@ class TestCaseBase(unittest.TestCase):
     # When non-None, a stand-in for fcntl module
     mock_fcntl = None
 
-    # repo. relative path containing test subject python file
-    SUBJECT_REL_PATH = 'bin'
-
-    # The name of the loaded code, as if it were a real module
-    SUBJECT_NAME = TEST_FILENAME[len('test_'):].split('.',1)[0]
-
-    # The complete path containing SUBJECT_NAME
-    SUBJECT_DIR = os.path.realpath(os.path.join(TESTS_DIR_PARENT, SUBJECT_REL_PATH))
-
-    # When non-none, reference to loaded subject as if it were a module
-    SUBJECT = None
-
-    # When non-none, complete path to unittest temporary directory
-    TEMPDIRPATH = None
-
     # Fake proccess ID of parent process
     PPID = 43
-
-    # When non-None, contains a tuple of patcher instances
-    patchers = None
-
-    # The complete path to the SUBJECT_NAME
-    for SUBJECT_PATH in glob(os.path.join(SUBJECT_DIR, '{}*'.format(SUBJECT_NAME))):
-        if os.path.isfile(SUBJECT_PATH):
-            # The subject may not conform to package.module standards
-            loader = importlib.machinery.SourceFileLoader(SUBJECT_NAME, SUBJECT_PATH)
-            # After python 3.6: Need loader for files w/o any extension
-            # so loader.exec_module() can be used.
-            SUBJECT = sys.modules[SUBJECT_NAME] = loader.load_module(SUBJECT_NAME)
-            break
-    else:
-        raise RuntimeError("Could not locate test subject: {} in {}".format(SUBJECT_NAME, SUBJECT_DIR))
-
-    def trace(self, statement=None):
-        """Enter the pdb debugger, 'n' will step back to self.trace() caller"""
-        return self._pdb.set_trace()
 
     def reset(self):
         self.MockOpen.reset_mock()
@@ -84,66 +43,54 @@ class TestCaseBase(unittest.TestCase):
             self.mock_fcntl.attach_mock(mockattr, attr)
         self.SUBJECT.InvCache.reset()
 
-
     def setUp(self):
         super(TestCaseBase, self).setUp()
-        self._pdb = Pdb()
-        self.TEMPDIRPATH = tempfile.mkdtemp(prefix=os.path.basename(__file__))
         self.mock_fcntl = create_autospec(spec=fcntl, spec_set=True, instance=True)
         self.mock_makedirs = create_autospec(spec=os.makedirs, spec_set=True,
                                                return_value=self.TEMPDIRPATH)
         # TODO: All of ``os`` and ``sys`` should probably just be patched up inside a loop
-        self.patchers = [patch('{}.tempfile.gettempdir'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=self.TEMPDIRPATH)),
-                         patch('{}.tempfile.TemporaryFile'.format(TestCaseBase.SUBJECT_NAME),
-                               create_autospec(spec=tempfile.TemporaryFile)),
-                         patch('{}.tempfile.mkdtemp'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=self.TEMPDIRPATH)),
-                         patch('{}.os.makedirs'.format(TestCaseBase.SUBJECT_NAME),
-                               self.mock_makedirs),
-                         patch('{}.os.path.isdir'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(spec=os.path.isdir, return_value=False)),
-                         patch('{}.os.getcwd'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=self.TEMPDIRPATH)),
-                         patch('{}.fcntl'.format(TestCaseBase.SUBJECT_NAME),
-                               self.mock_fcntl),
-                         patch('{}.open'.format(format(TestCaseBase.SUBJECT_NAME)),
-                               self.MockOpen, create=True),
-                         patch('{}.InvCache.filename'.format(TestCaseBase.SUBJECT_NAME),
-                               property(fget=MagicMock(return_value='bar'))),
-                         patch('{}.os.chdir'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(spec=self.SUBJECT.os.chdir)),
-                         patch('{}.os.setsid'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(spec=self.SUBJECT.os.setsid)),
-                         patch('{}.os.umask'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(spec=self.SUBJECT.os.umask)),
-                         patch('{}.os.closerange'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(spec=self.SUBJECT.os.closerange)),
-                         patch('{}.os.fork'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=0)),
-                         patch('{}.os.getpid'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=42)),
-                         patch('{}.os.getppid'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=self.PPID)),
-                         patch('{}.os.getgid'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=44)),
-                         patch('{}.os.unlink'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=45)),
-                         patch('{}.os.chmod'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=46)),
-                         patch('{}.os.getuid'.format(TestCaseBase.SUBJECT_NAME),
-                               MagicMock(return_value=47))]
-        for patcher in self.patchers:
-            patcher.start()
+        self.patchers += [patch('{}.tempfile.gettempdir'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=self.TEMPDIRPATH)),
+                          patch('{}.tempfile.TemporaryFile'.format(self.SUBJECT_NAME),
+                                create_autospec(spec=tempfile.TemporaryFile)),
+                          patch('{}.tempfile.mkdtemp'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=self.TEMPDIRPATH)),
+                          patch('{}.os.makedirs'.format(self.SUBJECT_NAME),
+                                self.mock_makedirs),
+                          patch('{}.os.path.isdir'.format(self.SUBJECT_NAME),
+                                MagicMock(spec=os.path.isdir, return_value=False)),
+                          patch('{}.os.getcwd'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=self.TEMPDIRPATH)),
+                          patch('{}.fcntl'.format(self.SUBJECT_NAME),
+                                self.mock_fcntl),
+                          patch('{}.open'.format(format(self.SUBJECT_NAME)),
+                                self.MockOpen, create=True),
+                          patch('{}.InvCache.filename'.format(self.SUBJECT_NAME),
+                                property(fget=MagicMock(return_value='bar'))),
+                          patch('{}.os.chdir'.format(self.SUBJECT_NAME),
+                                MagicMock(spec=self.SUBJECT.os.chdir)),
+                          patch('{}.os.setsid'.format(self.SUBJECT_NAME),
+                                MagicMock(spec=self.SUBJECT.os.setsid)),
+                          patch('{}.os.umask'.format(self.SUBJECT_NAME),
+                                MagicMock(spec=self.SUBJECT.os.umask)),
+                          patch('{}.os.closerange'.format(self.SUBJECT_NAME),
+                                MagicMock(spec=self.SUBJECT.os.closerange)),
+                          patch('{}.os.fork'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=0)),
+                          patch('{}.os.getpid'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=42)),
+                          patch('{}.os.getppid'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=self.PPID)),
+                          patch('{}.os.getgid'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=44)),
+                          patch('{}.os.unlink'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=45)),
+                          patch('{}.os.chmod'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=46)),
+                          patch('{}.os.getuid'.format(self.SUBJECT_NAME),
+                                MagicMock(return_value=47))]
+        self.start_patchers()
         self.reset()
-
-    def tearDown(self):
-        if hasattr(self, 'patchers'):
-            for patcher in self.patchers:
-                patcher.stop()
-        if self.TEMPDIRPATH:  # rm -rf /tmp/test_invcache.py*
-            for tempdirglob in glob('{}*'.format(self.TEMPDIRPATH)):
-                shutil.rmtree(tempdirglob, ignore_errors=True)
 
     def validate_mock_fcntl(self):
         """Helper to confirm cachefile-locking/unlocking was done properly"""
@@ -362,10 +309,10 @@ class TestMain(TestCaseBase):
         self.fake_stdout = StringIO()
         self.fake_stderr = StringIO()
         super(TestMain, self).setUp()
-        _patch = patch('{}.argparse.ArgumentParser.exit'.format(TestCaseBase.SUBJECT_NAME),
+        _patch = patch('{}.argparse.ArgumentParser.exit'.format(self.SUBJECT_NAME),
                        MagicMock(side_effect=self.mock_exit))
         self.patchers.append(_patch)
-        _patch.start()
+        _patch.start()  # Super call started the rest
 
     def test_noargs(self):
         """Script w/o args returns nothing"""
