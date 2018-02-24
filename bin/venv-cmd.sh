@@ -36,8 +36,7 @@ LOCKTIMEOUT_MINUTES="10"
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_DIR=$(dirname `realpath "$0"`)
 REPO_DIR=$(realpath "$SCRIPT_DIR/../")
-MACHINEID=$(cat /etc/machine-id || hostname | sha256sum | awk '{print $1}')
-MARKERFILE="./$VENV_DIRNAME/.${MACHINEID}_complete"
+MARKERFILE="./$VENV_DIRNAME/.complete"
 
 export WORKSPACE="${WORKSPACE:-$REPO_DIR}"
 export WORKSPACE=$(realpath $WORKSPACE)
@@ -122,8 +121,8 @@ echo
         rm -rf "$PIPCACHE"
         rm -rf "$VENV_DIRNAME"
         # N/B: local system's virtualenv binary - uncontrolled version fixed below
-        virtualenv --no-site-packages --python=python2 "./${VENV_DIRNAME}bootstrap"
-        python3 -m venv --copies "./${VENV_DIRNAME}bootstrap"
+        virtualenv --system-site-packages --python=python2 "./${VENV_DIRNAME}bootstrap"
+        python3 -m venv --system-site-packages "./${VENV_DIRNAME}bootstrap"
         # Set up paths to install/operate out of $WORKSPACE/${VENV_DIRNAME}bootstrap
         source "./${VENV_DIRNAME}bootstrap/bin/activate"
         # N/B: local system's pip binary - uncontrolled version fixed below
@@ -141,8 +140,8 @@ echo
             python3 -m pip $ARGS "$BSREQ"
         # Setup trusted virtualenv using hashed packages from $REQUIREMENTS
         [ "$PYTHON3SUPPORT" == 'false' ] || \
-            "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --copies "./$VENV_DIRNAME"
-        "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --no-site-packages --python=python2 "./$VENV_DIRNAME"
+            "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --system-site-packages "./$VENV_DIRNAME"
+        "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --system-site-packages --python=python2 "./$VENV_DIRNAME"
     fi
     echo "$@" > "$MARKERFILE"  # $VENV_DIRNAME and $PIPCACHE are now trusted
 
@@ -161,14 +160,18 @@ CLEANUP_PATHS="$BSREQ
 $WORKSPACE/${VENV_DIRNAME}bootstrap"
 trap cleanup EXIT
 
-source "$WORKSPACE/$VENV_DIRNAME/bin/activate"
+cd "$WORKSPACE"
 
-if [[ -r "$WORKSPACE/requirements.yml" ]] && [[ ! -r "$WORKSPACE/galaxy-roles/.installed" ]]
+source "./$VENV_DIRNAME/bin/activate"
+
+if [[ -r "./requirements.yml" ]] && [[ ! -r "./galaxy_roles/.installed" ]]
 then
     echo "Installing Ansible-Galaxy Roles from requirements.yml"
-    ansible-galaxy install --roles-path="$WORKSPACE/galaxy_roles" --role-file="$WORKSPACE/requirements.yml"
-    touch "$WORKSPACE/galaxy-roles/.installed"
+    ansible-galaxy install --roles-path="./galaxy_roles" --role-file="./requirements.yml"
+    touch "./galaxy_roles/.installed"
 fi
+
+cd "$WORKSPACE"
 
 echo "Executing $@"
 echo

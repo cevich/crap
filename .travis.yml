@@ -1,34 +1,29 @@
 ---
+
 dist: trusty
+sudo: required
 language: python
 python:
-    - "2.7"
+    - "3.6"
 
-sudo: required
-
-git:
-    submodules: false
+services:
+  - docker
 
 branches:
     only:
         - master
 
-matrix:
-    fast_finish: true
-    include:
-        - python: "2.7"
-          env: SUITE="Typo Check"
-        - python: "2.7"
-          env: SUITE="Unit test"
-        - python: "2.7"
-          env: SUITE="System test"
+env:
+    matrix:
+        - TEST: ./bin/typos.sh
+        - TEST: ./bin/unittest.sh
+        - TEST: ./bin/check.sh
+    global:
+        - DEBUG: true
 
 before_install:
     - sudo apt-get update -qq
-    - sudo apt-get install -qq docker realpath
-
-install:
-    - ./.travis.sh install
+    - sudo apt-get install -qq realpath
 
 script:
-    - ./.travis.sh "$SUITE"
+    - ./bin/run_ci_tests.sh

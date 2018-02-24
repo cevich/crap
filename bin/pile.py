@@ -90,7 +90,7 @@ class DebugAction(Action):
 
     @classmethod
     def _log_msg(cls, raw_lines, to_file):
-        out_lines = ['DEBUG: {0}\n'.format(line) for line in raw_lines]
+        out_lines = ['DEBUG: {0}'.format(line).rstrip() for line in raw_lines]
         to_file.write('\n'.join(out_lines))
         to_file.flush()
 
@@ -159,7 +159,7 @@ class Context(flock.Flock):
         dbgmsg("Using context data file: {0}".format(self.ctx_filepath))
         self.mkdirs('workspace', self.options.workspace)
         self.mkdirs('artifacts', self.options.artifacts)
-        self.mkdirs('logs', self.logfiledir)
+        self.mkdirs('logfile', self.logfiledir)
         super(Context, self).__init__()  # uses def_path / def_prefix
 
     @classmethod
@@ -320,7 +320,7 @@ class Context(flock.Flock):
         """Execute options.initcmd w/ or w/o downloading inituri first"""
         if self.options.initcmd.strip():
             if self.options.inituri.strip():
-                inittmp = tempfile.mkdtemp(suffix='tmp_', prefix='initcmd_')
+                inittmp = tempfile.mkdtemp(suffix='tmp', prefix='initcmd_')
                 os.chdir(inittmp)
                 atexit.register(shutil.rmtree, path=inittmp, ignore_errors=True)
                 if self.options.inituri:
@@ -420,7 +420,6 @@ def parse_args(argv=sys.argv, environ=os.environ):
 def main(argv=sys.argv, environ=os.environ):
 
     context = Context(parse_args(argv, environ), environ)
-    dbgmsg('Logging to {0}'.format(DebugAction.log_file.name))
     atexit.register(dbgmsg, "Cleaning up")
 
     with context.writer() as ctx_file: # Write-lock: Workspace being manipulated
