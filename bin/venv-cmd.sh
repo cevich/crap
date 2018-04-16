@@ -3,15 +3,16 @@
 # This wrapper-script reduces the number of python-dependencies needed to execute a command
 # and always executes from a fixed-version / verified environment. This means, no matter
 # what happens on the host package-wise, the nested command should behave in a very predictable
-# way (including, known bugs).  The last part is important, because under many CI/CD situations,
-# it's not possible to have much control over what happens on the OS-side, only within a process.
+# way (including, known bugs).  The last part is important, because bugs can be worked around
+# easier than unpredictable code-changes.
 #
 # It only requires the following (or equivalent) be installed for all platforms (unless I missed one):
 #
-#    python34 python34-devel python2-virtualenv gcc openssl-devel redhat-rpm-config libffi-devel
-#    python-devel python3-pycurl python-pycurl python2-simplejson util-linux
+#    python3 python3-devel python34 python34-devel python2-virtualenv gcc
+#    openssl-devel redhat-rpm-config libffi-devel python-devel python3-pycurl
+#    python-pycurl python2-simplejson util-linux
 #
-# Example usage (where ansible is NOT already installed)
+# Example usage:
 #
 #   $ ./bin/venv-cmd ansible-playbook --version
 #
@@ -28,21 +29,26 @@ then
     exit 3
 fi
 
+if [[ "${DEBUG:-false}" == "true" ]]
+then
+    set -x
+else
+    set +x
+fi
+
 # Don't leave __pycache__ directories everywhere
 PYTHONDONTWRITEBYTECODE="true"
-PYTHON3SUPPORT="${PYTHON3SUPPORT:-false}"
+PYTHON3SUPPORT="${PYTHON3SUPPORT:-false}"  # Only required for CI/Unittesting
 VENV_DIRNAME=".venv"
 LOCKTIMEOUT_MINUTES="10"
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_DIR=$(dirname `realpath "$0"`)
 REPO_DIR=$(realpath "$SCRIPT_DIR/../")
-MACHINEID=$(cat /etc/machine-id || hostname | sha256sum | awk '{print $1}')
-MARKERFILE="./$VENV_DIRNAME/.${MACHINEID}_complete"
 
 export WORKSPACE="${WORKSPACE:-$REPO_DIR}"
 export WORKSPACE=$(realpath $WORKSPACE)
 export PIPCACHE="$WORKSPACE/.cache/pip"
-mkdir -p "$WORKSPACE"
+MARKERFILE="$WORKSPACE/$VENV_DIRNAME/.complete"
 
 export ARTIFACTS="${ARTIFACTS:-$WORKSPACE/artifacts}"
 export ARTIFACTS=$(realpath "$ARTIFACTS")
@@ -50,16 +56,20 @@ mkdir -p "$ARTIFACTS"
 export LOGFILEPATH="$ARTIFACTS/$SCRIPT_NAME.log"
 
 REQUIREMENTS="$REPO_DIR/requirements.txt"
+# Boot-strap requirements are very minimal
 BSREQ="$(mktemp -p "" $(basename $0)_XXXX)"
 cat << EOF > "$BSREQ"
 pip==9.0.1 --hash=sha256:690b762c0a8460c303c089d5d0be034fb15a5ea2b75bdf565f40421f542fefb0
 virtualenv==15.1.0 --hash=sha256:39d88b533b422825d644087a21e78c45cf5af0ef7a99a1fc9fbb7b481e5c85b0
 EOF
+
 # (Line-delineated)
 CLEANUP_PATHS="$BSREQ
-$PIPCACHE
-$WORKSPACE/${VENV_DIRNAME}bootstrap
-$WORKSPACE/${VENV_DIRNAME}"
+               $PIPCACHE
+               $WORKSPACE/${VENV_DIRNAME}bootstrap
+               $WORKSPACE/${VENV_DIRNAME}"
+
+cd "$WORKSPACE"
 
 cleanup() {
     RET2="$?"  # prior exit code
@@ -115,15 +125,15 @@ echo
   echo
   set -ex
   (
-    cd "$WORKSPACE"
     # When running more than once, make it fast by skipping the bootstrap
     if [ ! -d "./$VENV_DIRNAME" ] || [ ! -r "$MARKERFILE" ]
     then  # Don't allow previously broken cache to break fresh setup
+        echo "Setting up a new virtual environment"
         rm -rf "$PIPCACHE"
         rm -rf "$VENV_DIRNAME"
         # N/B: local system's virtualenv binary - uncontrolled version fixed below
-        virtualenv --no-site-packages --python=python2 "./${VENV_DIRNAME}bootstrap"
-        python3 -m venv --copies "./${VENV_DIRNAME}bootstrap"
+        virtualenv --python=python2 "./${VENV_DIRNAME}bootstrap"
+        python3 -m venv "./${VENV_DIRNAME}bootstrap"
         # Set up paths to install/operate out of $WORKSPACE/${VENV_DIRNAME}bootstrap
         source "./${VENV_DIRNAME}bootstrap/bin/activate"
         # N/B: local system's pip binary - uncontrolled version fixed below
@@ -141,8 +151,10 @@ echo
             python3 -m pip $ARGS "$BSREQ"
         # Setup trusted virtualenv using hashed packages from $REQUIREMENTS
         [ "$PYTHON3SUPPORT" == 'false' ] || \
-            "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv --copies "./$VENV_DIRNAME"
-        "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --no-site-packages --python=python2 "./$VENV_DIRNAME"
+            "./${VENV_DIRNAME}bootstrap/bin/python3" -m venv "./$VENV_DIRNAME"
+        "./${VENV_DIRNAME}bootstrap/bin/virtualenv" --python=python2 "./$VENV_DIRNAME"
+    else
+        echo "Using existing virtual environment"
     fi
     echo "$@" > "$MARKERFILE"  # $VENV_DIRNAME and $PIPCACHE are now trusted
 
@@ -161,8 +173,16 @@ CLEANUP_PATHS="$BSREQ
 $WORKSPACE/${VENV_DIRNAME}bootstrap"
 trap cleanup EXIT
 
-# Enter trusted virtualenv in this shell
-source "$WORKSPACE/$VENV_DIRNAME/bin/activate"
+source "./$VENV_DIRNAME/bin/activate"
+
+if [[ -r "./requirements.yml" ]] && [[ ! -r "./galaxy_roles/.installed" ]]
+then
+    echo "Installing Ansible-Galaxy Roles from requirements.yml"
+    mkdir -p ./galaxy_roles
+    ansible-galaxy install --roles-path="./galaxy_roles" --role-file="./requirements.yml"
+    touch "./galaxy_roles/.installed"
+fi
+
 echo "Executing $@"
 echo
 "$@"
